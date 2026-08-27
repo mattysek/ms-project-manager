@@ -1,0 +1,91 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Common/Clock.fs" />
+    <Compile Include="Common/Collections.fs" />
+    <Compile Include="Domain/Types.fs" />
+    <Compile Include="Domain/Ado.fs" />
+    <Compile Include="Domain/AdoMarkdown.fs" />
+    <Compile Include="Domain/AdoSync.fs" />
+    <Compile Include="Domain/AdoChanges.fs" />
+    <Compile Include="Domain/State.fs" />
+    <Compile Include="Domain/Patches.fs" />
+    <Compile Include="Domain/Commands.fs" />
+    <Compile Include="Domain/Diffs.fs" />
+    <Compile Include="Domain/AdoGateway.fs" />
+    <Compile Include="Domain/Weeks.fs" />
+    <Compile Include="Domain/Ownership.fs" />
+    <Compile Include="Domain/Authorization.fs" />
+    <Compile Include="Domain/Reducers/Tasks.fs" />
+    <Compile Include="Domain/Reducers/People.fs" />
+    <Compile Include="Domain/Reducers/ProjectMeta.fs" />
+    <Compile Include="Domain/Reducers/Risks.fs" />
+    <Compile Include="Domain/Reducers/Knowledge.fs" />
+    <Compile Include="Domain/Reducers/Personal.fs" />
+    <Compile Include="Domain/Reducers/Files.fs" />
+    <Compile Include="Domain/Reducers/Session.fs" />
+    <Compile Include="Domain/Reducer.fs" />
+    <Compile Include="Protocol/Json.fs" />
+    <Compile Include="Persistence/Repository.fs" />
+    <Compile Include="Persistence/Repositories/Projects.fs" />
+    <Compile Include="Persistence/Repositories/Members.fs" />
+    <Compile Include="Persistence/Repositories/Files.fs" />
+    <Compile Include="Persistence/Repositories/QuickNotes.fs" />
+    <Compile Include="Persistence/Repositories/AdoCredentials.fs" />
+    <Compile Include="Persistence/Repositories/KbRevisions.fs" />
+    <Compile Include="Integration/AdoApiClient.fs" />
+    <Compile Include="Integration/AdoBridgeContext.fs" />
+    <Compile Include="Integration/AdoBridgeSync.fs" />
+    <Compile Include="Integration/AdoBridgeActions.fs" />
+    <Compile Include="Integration/AdoBridge.fs" />
+    <Compile Include="Actors/ProjectStore.fs" />
+    <Compile Include="Actors/ProjectActor.fs" />
+    <Compile Include="Actors/ProjectActorRegistry.fs" />
+    <Compile Include="Actors/EfProjectStore.fs" />
+    <Compile Include="Realtime/Presence.fs" />
+    <Compile Include="Realtime/Membership.fs" />
+    <Compile Include="Realtime/ProjectHub.fs" />
+    <Compile Include="Api/Contracts.fs" />
+    <Compile Include="Api/Http.fs" />
+    <Compile Include="Api/Auth.fs" />
+    <Compile Include="Api/Admin.fs" />
+    <Compile Include="Api/ProjectsApi.fs" />
+    <Compile Include="Api/FilesApi.fs" />
+    <Compile Include="Api/KnowledgeApi.fs" />
+    <Compile Include="Api/QuickNotesApi.fs" />
+    <Compile Include="Api/WorkloadApi.fs" />
+    <Compile Include="Hosting/Options.fs" />
+    <Compile Include="Hosting/SecurityHeaders.fs" />
+    <Compile Include="Hosting/CacheHeaders.fs" />
+    <Compile Include="Hosting/Services.fs" />
+    <Compile Include="Hosting/Endpoints.fs" />
+    <Compile Include="Hosting/StaticFiles.fs" />
+    <Compile Include="Program.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../MSProjectManager.Persistence/MSProjectManager.Persistence.fsproj" />
+    <!--
+      Referencuje se kvůli běhu (`Database.Migrate()` musí migrační assembly
+      najít), ne kvůli překladu — v F# kódu se na ni nikde nesahá.
+    -->
+    <ProjectReference Include="../MSProjectManager.Migrations/MSProjectManager.Migrations.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FSharp.SystemTextJson" Version="1.4.36" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.10" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
+  </ItemGroup>
+
+</Project>

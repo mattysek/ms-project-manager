@@ -1,0 +1,51 @@
+{
+  "name": "ms-project-manager",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "build:web": "../../build/build.sh web",
+    "build:server": "../../build/build.sh server",
+    "build:all": "../../build/build.sh all",
+    "publish": "../../build/build.sh publish",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
+    "format": "biome format --write .",
+    "check": "biome check .",
+    "test": "vitest",
+    "test:run": "vitest run"
+  },
+  "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.2.7",
+    "@fontsource/ibm-plex-sans": "^5.2.8",
+    "@microsoft/signalr": "^10.0.11",
+    "@types/turndown": "^5.0.6",
+    "dompurify": "^3.2.7",
+    "html2canvas": "^1.4.1",
+    "jszip": "^3.10.1",
+    "mammoth": "^1.11.0",
+    "marked": "^17.0.4",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "turndown": "^7.2.2",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.7",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/marked": "^6.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "fake-indexeddb": "^6.2.5",
+    "jsdom": "^25.0.1",
+    "typescript": "^5.3.0",
+    "vite": "^5.0.0",
+    "vitest": "^2.1.9"
+  }
+}

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Jediný C# projekt v repozitáři. Existuje z jednoho důvodu: EF Core neumí
+    generovat migrace pro F# (ADR-013), ale generátor se řídí jazykem
+    *migračního* projektu — ne jazykem projektu s `DbContext`em. Díky tomu
+    zůstávají entity i kontext v F# a zpátky získáváme `dotnet ef migrations
+    add` včetně `ModelSnapshot`.
+
+    Obsah složky Migrations/ je generovaný, needituje se ručně — postup je
+    v ADR-013 a v build.sh (cíl `migration`).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <!-- Generovaný kód nemá XML doc komentáře ani nesplňuje naše warningy. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../MSProjectManager.Persistence/MSProjectManager.Persistence.fsproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

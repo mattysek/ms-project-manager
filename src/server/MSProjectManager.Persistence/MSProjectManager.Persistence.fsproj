@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Schéma databáze — entity, `AppDbContext`, SQLite pragmy a design-time
+    továrna. Vlastní projekt proto, aby na něj mohl referencovat C# projekt
+    s migracemi, aniž by vznikl kruh (viz ADR-013).
+
+    Nezávisí na doméně: repozitáře, které `AppState` znají, zůstávají
+    v serverovém projektu pod `Persistence/Repositories/`.
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Entities.fs" />
+    <Compile Include="Sqlite.fs" />
+    <Compile Include="AppDbContext.fs" />
+    <Compile Include="DesignTime.fs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.10">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.10" />
+    <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.5" />
+  </ItemGroup>
+
+</Project>

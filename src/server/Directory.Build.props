@@ -1,0 +1,48 @@
+<Project>
+
+  <!--
+    Sdílená nastavení pro všechny F# projekty pod server/.
+    Viz ADR-012 (kvalita kódu a statická analýza).
+  -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!--
+    Warnings as errors.
+
+    Nejcennější důsledek pro tuhle architekturu: FS0025 (neúplný pattern match)
+    se stává chybou. Přidání nového ProjectCommand bez obsloužení ve všech
+    reducerech tím shodí build místo aby tiše propadlo za běhu.
+
+    Lokální build umí varování jen jako varování:
+        dotnet build -p:TreatWarningsAsErrors=false
+  -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <WarningLevel>5</WarningLevel>
+
+    <!--
+      Varování, která F# defaultně mlčí:
+        1182 - nepoužitá proměnná (obdoba noUnusedLocals v tsconfig)
+        3390 - špatně formovaný XML doc komentář
+        3517 - implicitní převod způsobující kopii struktury
+    -->
+    <OtherFlags>$(OtherFlags) --warnon:1182 --warnon:3390 --warnon:3517</OtherFlags>
+  </PropertyGroup>
+
+  <!--
+    Testovací projekty: nepoužitá proměnná v testu je běžná (arrange bez assert),
+    proto tam 1182 nevynucujeme.
+  -->
+  <PropertyGroup Condition="$(MSBuildProjectName.EndsWith('.Tests'))">
+    <OtherFlags>$(OtherFlags) --nowarn:1182</OtherFlags>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

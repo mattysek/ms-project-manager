@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="MSProjectManager.Persistence/MSProjectManager.Persistence.fsproj" />
+  <Project Path="MSProjectManager.Migrations/MSProjectManager.Migrations.csproj" />
+  <Project Path="MSProjectManager.Server.Tests/MSProjectManager.Server.Tests.fsproj" />
+  <Project Path="MSProjectManager.Server/MSProjectManager.Server.fsproj" />
+</Solution>

@@ -1,0 +1,37 @@
+# Build output
+src/client/dist/
+publish/
+
+# wwwroot je vlastněný buildem frontendu (viz ADR-011)
+src/server/*/wwwroot/
+
+# Dependencies
+node_modules/
+
+# .NET
+bin/
+obj/
+
+# Lokální data a konfigurace
+*.db
+*.db-shm
+*.db-wal
+
+# Runtime data serveru — DB a key ring Data Protection (ADR-008).
+# Klíče jsou tajemství: do repozitáře nepatří ani omylem.
+src/server/*/data/
+src/server/*/keys/
+appsettings.Development.json
+appsettings.Local.json
+
+# IDE
+.vs/
+.idea/
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data lokálního demo běhu (build/demo.sh)
+.demo/
