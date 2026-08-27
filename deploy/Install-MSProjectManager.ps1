@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Nainstaluje nebo aktualizuje MSProjectManager jako Windows Service.
 
@@ -18,6 +18,11 @@
     - Účet služby dostane právo zápisu jen do těch dvou složek, nikam jinam.
     - `AllowedHosts` se nastaví na hostname; ponechat `*` znamená přijímat
       požadavky s libovolnou hlavičkou Host.
+    - S `-CertificateThumbprint` dostane účet služby i právo ČTENÍ na privátní
+      klíč certifikátu. Bez něj Kestrel při startu TLS spadne s chybou SSPI
+      0x8009030D ("cryptographic module") — certifikát v LocalMachine\My smí
+      použít jen účet, který ho tam naimportoval (typicky správce), ne
+      NetworkService, pod kterým běží služba.
 
 .PARAMETER Hostname
     Hostname, na kterém bude služba dostupná. Zapíše se do `AllowedHosts`
@@ -66,6 +71,10 @@ $ServiceName = 'MSProjectManager'
 $DisplayName = 'MS Project Manager'
 $ExeName = 'MSProjectManager.Server.exe'
 $SourceDir = $PSScriptRoot
+# Pod tímhle účtem služba běží (New-DataFolders, Install-Service i
+# Grant-CertificatePrivateKeyAccess ho musí mít stejný, jinak ACL cílí jinam
+# než skutečný běžící proces).
+$ServiceAccount = 'NT AUTHORITY\NetworkService'
 
 function Write-Step($message) { Write-Host "▸ $message" -ForegroundColor Cyan }
 function Write-Ok($message) { Write-Host "✓ $message" -ForegroundColor Green }
@@ -149,14 +158,134 @@ function New-DataFolders {
 
     # Zapisovatelná musí být celá SLOŽKA, ne jen soubor databáze — WAL mód
     # zakládá sourozence -wal a -shm (PRD-00).
-    $account = 'NT AUTHORITY\NETWORK SERVICE'
     $acl = Get-Acl $DataPath
     $rule = New-Object Security.AccessControl.FileSystemAccessRule(
-        $account, 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+        $ServiceAccount, 'Modify', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
     $acl.SetAccessRule($rule)
     Set-Acl -Path $DataPath -AclObject $acl
 
-    Write-Ok "Práva zápisu pro $account nastavena na $DataPath"
+    Write-Ok "Práva zápisu pro $ServiceAccount nastavena na $DataPath"
+}
+
+function Grant-ReadAccessAsSystem {
+    <#
+        Soubory pod SystemKeys\ vlastní NT AUTHORITY\SYSTEM a jejich ACL nejde
+        zapsat ani jako správce (chybí WRITE_DAC) — obvyklé řešení je
+        `takeown /F`, jenže to natrvalo přepíše Owner ze SYSTEM na správce.
+        To je pro pouhé přidání jednoho práva ke čtení zbytečně invazivní
+        změna a v auditu vypadá hůř, než co se skutečně stalo.
+
+        Místo toho spustí icacls SYSTEM sám — přes dočasnou naplánovanou
+        úlohu s LogonType ServiceAccount. SYSTEM soubor už vlastní, takže ACL
+        zapíše bez jakéhokoli přebírání. Úloha se smaže hned po doběhnutí
+        (try/finally), na disku ani v Plánovači úloh po ní nic nezůstane.
+    #>
+    param(
+        [Parameter(Mandatory = $true)] [string] $Path,
+        [Parameter(Mandatory = $true)] [string] $Account
+    )
+
+    $taskName = "MSPM-GrantKeyAccess-$([Guid]::NewGuid().ToString('N').Substring(0, 8))"
+    $action = New-ScheduledTaskAction -Execute 'icacls.exe' -Argument "`"$Path`" /grant `"${Account}:(R)`""
+    $principal = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+
+    Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal | Out-Null
+    try {
+        Start-ScheduledTask -TaskName $taskName
+
+        $deadline = (Get-Date).AddSeconds(15)
+        do {
+            Start-Sleep -Milliseconds 200
+            $state = (Get-ScheduledTask -TaskName $taskName).State
+        } while ($state -eq 'Running' -and (Get-Date) -lt $deadline)
+
+        $result = (Get-ScheduledTaskInfo -TaskName $taskName).LastTaskResult
+        if ($result -ne 0) {
+            throw "icacls spuštěný jako SYSTEM selhal (návratový kód $result)"
+        }
+    } finally {
+        Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+    }
+}
+
+function Grant-CertificatePrivateKeyAccess {
+    <#
+        Kestrel běží pod $ServiceAccount, ne pod účtem, který certifikát do
+        LocalMachine\My naimportoval (typicky správce) — a jen ten druhý má
+        na privátní klíč přístup ve výchozím stavu. Bez tohohle kroku selže
+        start TLS s chybou SSPI 0x8009030D ("cryptographic module"), viditelnou
+        jen v systémovém logu, ne v logu aplikace.
+
+        Klíč může být uložený dvěma různými způsoby (novější CNG, nebo starší
+        CAPI) a každý žije jinde na disku. U CNG navíc nestačí ani to — pokud
+        byl certifikát dovezený přes MMC/AD CS s izolací jen pro účet SYSTEM,
+        klíč leží v `SystemKeys\`, ne v `Keys\`. Proto se cesta nehádá jedním
+        pevným vzorem, ale hledá se podle jména souboru napříč celým
+        `%ProgramData%\Microsoft\Crypto\`, a zápis ACL na SYSTEM-vlastněný
+        soubor jde přes Grant-ReadAccessAsSystem — ne přes převzetí
+        vlastnictví (viz její komentář).
+    #>
+    param(
+        [Parameter(Mandatory = $true)] [string] $Thumbprint,
+        [Parameter(Mandatory = $true)] [string] $Account
+    )
+
+    Write-Step "Nastavuji čtení privátního klíče certifikátu pro $Account"
+
+    $cert = Get-ChildItem "Cert:\LocalMachine\My\$Thumbprint" -ErrorAction SilentlyContinue
+    if (-not $cert) {
+        throw "Certifikát s otiskem '$Thumbprint' nebyl nalezen v LocalMachine\My."
+    }
+    if (-not $cert.HasPrivateKey) {
+        throw "Certifikát '$Thumbprint' nemá privátní klíč — Kestrel by na něm TLS spojení nenavázal."
+    }
+
+    $rsaKey = [Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPrivateKey($cert)
+    if (-not $rsaKey) {
+        throw "Privátní klíč certifikátu '$Thumbprint' není RSA — skript umí nastavit oprávnění jen pro RSA klíče."
+    }
+
+    if ($rsaKey -is [Security.Cryptography.RSACng]) {
+        $keyFileName = $rsaKey.Key.UniqueName
+    } else {
+        $keyFileName = $rsaKey.CspKeyContainerInfo.UniqueKeyContainerName
+    }
+
+    $cryptoRoot = Join-Path $env:ProgramData 'Microsoft\Crypto'
+    $keyPath =
+        Get-ChildItem -Path $cryptoRoot -Recurse -Filter $keyFileName -File -ErrorAction SilentlyContinue |
+            Select-Object -First 1 -ExpandProperty FullName
+
+    if (-not $keyPath) {
+        throw "Soubor privátního klíče '$keyFileName' nebyl nalezen pod $cryptoRoot (certifikát $Thumbprint). Není klíč na hardwarovém tokenu / TPM?"
+    }
+
+    $targetSid = ([Security.Principal.NTAccount] $Account).Translate([Security.Principal.SecurityIdentifier])
+    $acl = Get-Acl -Path $keyPath
+
+    $alreadyGranted = $acl.Access | Where-Object {
+        ($_.FileSystemRights -band [Security.AccessControl.FileSystemRights]::Read) -and
+        $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq $targetSid.Value
+    }
+
+    if ($alreadyGranted) {
+        Write-Ok 'Právo čtení na privátní klíč už bylo nastaveno dřív'
+        return
+    }
+
+    try {
+        $rule = New-Object Security.AccessControl.FileSystemAccessRule($Account, 'Read', 'Allow')
+        $acl.AddAccessRule($rule)
+        Set-Acl -Path $keyPath -AclObject $acl
+    } catch [UnauthorizedAccessException] {
+        # Soubor patří SYSTEM (typicky SystemKeys\) a jeho ACL nejde zapsat
+        # ani jako správce — Grant-ReadAccessAsSystem přidá právo jako SYSTEM
+        # sám, beze změny vlastnictví.
+        Write-Warn 'Přímý zápis ACL odmítnut (soubor patří SYSTEM) — právo přidávám úlohou spuštěnou jako SYSTEM'
+        Grant-ReadAccessAsSystem -Path $keyPath -Account $Account
+    }
+
+    Write-Ok "Právo čtení privátního klíče uděleno: $keyPath"
 }
 
 function Write-Configuration {
@@ -206,7 +335,7 @@ function Install-Service {
         New-Service -Name $ServiceName -BinaryPathName "`"$exe`"" `
             -DisplayName $DisplayName -StartupType Automatic `
             -Description 'Kapacitní plánování a správa projektů (interní nástroj).' | Out-Null
-        sc.exe config $ServiceName obj= 'NT AUTHORITY\NetworkService' | Out-Null
+        sc.exe config $ServiceName obj= $ServiceAccount | Out-Null
     }
 
     # Po pádu se služba sama zvedne; třetí pokus až po minutě, ať se
@@ -223,6 +352,15 @@ function Install-Service {
 
 function Open-Firewall {
     $ruleName = "MSProjectManager ($Port)"
+
+    # Název pravidla nese port, takže opakovaný běh se změněným -Port by jinak
+    # jen přidával další a další pravidla — staré zůstane otevřené i pro port,
+    # na kterém už dávno nic neposlouchá. Napřed se uklidí všechna dřívější
+    # pravidla tohoto skriptu, pak se založí jedno pro aktuální port.
+    Get-NetFirewallRule -DisplayName 'MSProjectManager (*)' -ErrorAction SilentlyContinue |
+        Where-Object { $_.DisplayName -ne $ruleName } |
+        Remove-NetFirewallRule
+
     if (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContinue) { return }
 
     Write-Step "Otevírám port $Port ve firewallu (profil Domain, Private)"
@@ -276,6 +414,9 @@ Copy-Binaries
 New-DataFolders
 Write-Configuration
 Install-Service
+if ($CertificateThumbprint) {
+    Grant-CertificatePrivateKeyAccess -Thumbprint $CertificateThumbprint -Account $ServiceAccount
+}
 Open-Firewall
 Start-AndVerify
 
