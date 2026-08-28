@@ -2,7 +2,7 @@
 
 ## Přehled
 
-Systém vyžaduje autentizaci pro přístup ke všem funkcím. Uživatelé se přihlašují pomocí uživatelského jména a hesla. Registrace není veřejná — uživatelské účty vytváří Admin (nebo PM v rámci svého projektu pozváním existujícího účtu).
+Systém vyžaduje autentizaci pro přístup ke všem funkcím. Uživatelé se přihlašují pomocí uživatelského jména a hesla. Účet si uživatel může **založit sám** (FR-AUTH-08), nebo mu ho založí Admin (FR-AUTH-05); do projektu ho pak přidá PM. Samoobslužnou registraci lze v konfiguraci vypnout — viz doplněk k [ADR-003](../adr/ADR-003-authentication.md).
 
 ## Cíle
 
@@ -13,7 +13,6 @@ Systém vyžaduje autentizaci pro přístup ke všem funkcím. Uživatelé se p�
 
 ## Non-goals
 
-- Veřejná samoobslužná registrace
 - OAuth / OIDC / LDAP / Active Directory integrace
 - Dvoufaktorová autentizace (2FA)
 - Resetování hesla přes email (první verze — admin resetuje ručně)
@@ -62,8 +61,26 @@ Systém vyžaduje autentizaci pro přístup ke všem funkcím. Uživatelé se p�
 - Kliknutím na jméno se otevře dropdown s: Změna hesla, Odhlásit
 
 ### FR-AUTH-07: První spuštění
-- Při prvním spuštění aplikace (prázdná DB) je uživatel přesměrován na stránku vytvoření admin účtu
-- Po vytvoření admin účtu je uživatel automaticky přihlášen
+- Při prvním spuštění aplikace (prázdná DB) je uživatel přesměrován na stránku vytvoření admin účtu na URL `/setup`
+- Formulář obsahuje pole: Uživatelské jméno, Display name, Heslo, tlačítko "Vytvořit"
+- Po odeslání formuláře tlačítko viditelně signalizuje probíhající operaci ("Vytvářím účet…") a je nedostupné, aby se účet nezaložil dvakrát
+- Po vytvoření admin účtu je uživatel automaticky přihlášen (odpověď nese session cookie) **a okamžitě přesměrován na LandingPage (seznam projektů) na URL `/`**
+- Obrazovka setupu se po úspěšném založení účtu už nesmí zobrazit — aplikace se nesmí ptát serveru znovu, zda je setup potřeba, ani zůstat stát na formuláři
+- Při selhání (např. heslo nesplňuje minimální délku) zůstane uživatel na formuláři s chybovou hláškou a může odeslat znovu
+
+> **Pozn. k regresi:** obrazovka setupu zůstávala po odeslání viset, přestože se admin založil a session platila — brána si stav "setup je potřeba" načetla jen jednou při startu a nikdy ho nepřepnula, takže větev se setupem měla přednost před větví přihlášeného uživatele. Navenek to vypadalo, že tlačítko nereaguje. Scénář to sice popisoval, ale nárokoval si ho pouze serverový test, který vidí jen `POST /auth/setup`; klientskou stranu nekontroloval nikdo.
+
+### FR-AUTH-08: Samoobslužná registrace
+- Nepřihlášený uživatel se dostane na registraci z přihlašovací stránky odkazem „Zaregistrovat se" a na URL `/register`
+- Formulář obsahuje: Uživatelské jméno, Display name, Heslo, Potvrzení hesla, tlačítko „Zaregistrovat se"
+- Po úspěšné registraci je uživatel **rovnou přihlášen** a přesměrován na LandingPage (stejně jako po prvním spuštění, FR-AUTH-07)
+- Nový účet dostane **běžná práva**: není Admin a není členem žádného projektu. Vidí prázdný seznam projektů, dokud si nějaký nezaloží nebo ho někdo nepřidá do svého
+- Obsazené uživatelské jméno vrátí „Uživatelské jméno je již obsazeno"; neshodná hesla „Hesla se neshodují"; krátké heslo hlášku podle NFR
+- Registrace jde **vypnout konfigurací** (`Auth:AllowSelfRegistration`, výchozí zapnuto). Když je vypnutá:
+  - odkaz „Zaregistrovat se" se na přihlašovací stránce nezobrazí,
+  - `/register` zobrazí sdělení, že registrace není povolená,
+  - **server odmítne i přímé volání** `POST /auth/register` (403) — skryté tlačítko není autorizace
+- Registrace **nenahrazuje první spuštění**: do prázdné databáze patří admin přes `/auth/setup`, a dokud žádný účet neexistuje, registrace se odmítne (409). Jinak by první příchozí dostal běžný účet a systém by zůstal bez administrátora
 
 ## Non-funkcionální požadavky
 
@@ -76,6 +93,8 @@ Systém vyžaduje autentizaci pro přístup ke všem funkcím. Uživatelé se p�
 
 ## Out of scope
 
+- Ověření e-mailem / potvrzovací odkaz při registraci (účty jsou rovnou aktivní)
+- Registrace na pozvánku (invite link) nebo přes sdílený registrační kód
 - Zapomenuté heslo přes email
 - OAuth providers (Google, Microsoft, GitHub)
 - API keys pro programatický přístup

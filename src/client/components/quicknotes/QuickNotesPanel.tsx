@@ -5,7 +5,7 @@ import type { QuickNote } from '../../api/quickNotesApi';
 import type { UseQuickNotesResult } from '../../hooks/useQuickNotes';
 import { NoteList } from './NoteList';
 import { NoteEditor } from './NoteEditor';
-import { LAYERS } from '../../constants/layers';
+import { FloatingPanel } from '../FloatingPanel';
 
 interface ProjectOption {
   id: string;
@@ -29,7 +29,6 @@ function PendingBadge({ count }: { count: number }) {
   return (
     <span
       style={{
-        marginLeft: 8,
         padding: '1px 7px',
         fontSize: 9,
         borderRadius: 8,
@@ -40,37 +39,6 @@ function PendingBadge({ count }: { count: number }) {
     >
       {label}
     </span>
-  );
-}
-
-function PanelHeader({ onClose, pendingCount }: { onClose: () => void; pendingCount: number }) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        padding: '12px 14px',
-        borderBottom: '1px solid #1e2533',
-      }}
-    >
-      <span style={{ fontSize: 12, fontWeight: 700, color: '#f1f5f9' }}>Moje poznámky</span>
-      <PendingBadge count={pendingCount} />
-      <button
-        type="button"
-        onClick={onClose}
-        aria-label="Zavřít poznámky"
-        style={{
-          marginLeft: 'auto',
-          background: 'none',
-          border: 'none',
-          color: '#64748b',
-          cursor: 'pointer',
-          fontSize: 16,
-        }}
-      >
-        ×
-      </button>
-    </div>
   );
 }
 
@@ -133,24 +101,13 @@ export function QuickNotesPanel({
   const [selection, setSelection] = useState<Selection>({ kind: 'list' });
 
   return (
-    <div
-      role="dialog"
-      aria-label="Quick Notes"
-      style={{
-        position: 'fixed',
-        top: 0,
-        right: 0,
-        bottom: 0,
-        width: 340,
-        background: '#0f1117',
-        borderLeft: '1px solid #1e2533',
-        zIndex: LAYERS.quickNotes,
-        display: 'flex',
-        flexDirection: 'column',
-        boxShadow: '-8px 0 24px rgba(0,0,0,.4)',
-      }}
+    <FloatingPanel
+      label="Quick Notes"
+      title="📝 Moje poznámky"
+      closeLabel="Zavřít poznámky"
+      headerExtra={<PendingBadge count={notes.pendingCount} />}
+      onClose={onClose}
     >
-      <PanelHeader onClose={onClose} pendingCount={notes.pendingCount} />
       <PanelBody
         notes={notes}
         projects={projects}
@@ -159,6 +116,6 @@ export function QuickNotesPanel({
         selection={selection}
         setSelection={setSelection}
       />
-    </div>
+    </FloatingPanel>
   );
 }

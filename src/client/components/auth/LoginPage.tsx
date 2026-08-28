@@ -7,9 +7,19 @@ interface LoginPageProps {
   onLoggedIn: () => void;
   /** FR-AUTH-03: informace po vypršení session, nikoli chyba přihlášení. */
   sessionExpiredNotice?: boolean;
+  /**
+   * Přechod na registraci; `undefined` = server ji nepovoluje, odkaz se
+   * nezobrazí (FR-AUTH-08). Skrytí je jen UX — rozhoduje server.
+   */
+  onRegister?: () => void;
 }
 
-export function LoginPage({ onLogin, onLoggedIn, sessionExpiredNotice }: LoginPageProps) {
+export function LoginPage({
+  onLogin,
+  onLoggedIn,
+  sessionExpiredNotice,
+  onRegister,
+}: LoginPageProps) {
   const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -73,6 +83,23 @@ export function LoginPage({ onLogin, onLoggedIn, sessionExpiredNotice }: LoginPa
         >
           Přihlásit se
         </button>
+        {onRegister && (
+          <button
+            type="button"
+            onClick={onRegister}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#64748b',
+              cursor: 'pointer',
+              fontSize: 11,
+              textDecoration: 'underline',
+              fontFamily: 'inherit',
+            }}
+          >
+            Zaregistrovat se
+          </button>
+        )}
       </form>
     </AuthShell>
   );

@@ -62,6 +62,28 @@ Feature: Moje práce napříč projekty (PRD-08)
     When detail zavře a otevře znovu jiný úkol
     Then se předchozí detail sám neotevře
 
+  Scenario: Přehled začíná na aktuálním týdnu
+    # Seznam obsahuje i týdny, které už jsou za námi — nedokončený úkol
+    # z minulého měsíce v něm zůstává. Bez posunu uživatel přistane na
+    # nejstarší rozdělané práci a k dnešku se musí prorolovat.
+    Given "petra.kolarova" má úkoly v minulých i v budoucích týdnech
+    When otevře "Moje práce"
+    Then je obrazovka posunutá na aktuální týden
+    And ten týden je označený jako "tento týden"
+
+  Scenario: Bez práce v aktuálním týdnu se přehled posune na nejbližší další
+    Given "petra.kolarova" nemá tento týden žádný úkol
+    And nejbližší práci má za dva týdny
+    When otevře "Moje práce"
+    Then je obrazovka posunutá na ten týden
+
+  Scenario: Ruční obnovení uživatele neodroluje zpátky
+    # Přehled se obnovuje často (čte se mimo actory), takže by ho posun při
+    # každém kliknutí vytrhl z místa, kam se právě prokoukal.
+    Given "petra.kolarova" je v přehledu odrolovaná jinam
+    When klikne "Obnovit"
+    Then se obrazovka na aktuální týden znovu neposune
+
   Scenario: Přehled přiznává, že může být pozadu
     # Čte se mimo actory (ADR-015), takže může být až o jeden persist tick
     # pozadu. Radši to řekneme, než aby si uživatel myslel, že je živý.

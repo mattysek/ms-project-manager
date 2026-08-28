@@ -19,6 +19,11 @@ type AuthOptions =
         RequireHttps: bool
     }
 
+    // Pozn.: `Auth:AllowSelfRegistration` tu schválně NENÍ. Má jediného
+    // konzumenta (`Api/Auth.fs`) a `Api` se překládá před `Hosting`, takže by
+    // na tenhle typ stejně nedosáhlo — a závislost Api → kompoziční kořen by
+    // byla obrácená proti vrstvení.
+
 /// Nastavení actorů (ADR-002).
 type ActorSettings =
     {

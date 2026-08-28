@@ -2,7 +2,8 @@
 //
 // Kontrakt je doslova podle `server/.../Api/Auth.fs` a `Api/Contracts.fs`:
 // `POST /auth/login`, `POST /auth/logout`, `GET /auth/me`,
-// `POST /auth/change-password`, `GET /auth/setup-required`, `POST /auth/setup`.
+// `POST /auth/change-password`, `GET /auth/setup-required`, `POST /auth/setup`,
+// `POST /auth/register`.
 import { apiRequest, ApiError } from './httpClient';
 
 export { ApiError };
@@ -42,9 +43,38 @@ export async function changePassword(currentPassword: string, newPassword: strin
   });
 }
 
-export async function isSetupRequired(): Promise<boolean> {
-  const result = await apiRequest<{ required: boolean }>('/auth/setup-required');
-  return result.required;
+/**
+ * Co se dá dělat před přihlášením — první spuštění a povolená registrace.
+ *
+ * Jedno volání pro obojí: `AuthGate` obě odpovědi potřebuje ve stejnou chvíli
+ * a druhý round trip při startu aplikace by za to nestál. Cesta zůstává
+ * `/auth/setup-required`, protože na ni čeká i healthcheck v `e2e/run.sh`.
+ */
+export interface AuthBootstrap {
+  setupRequired: boolean;
+  registrationAllowed: boolean;
+}
+
+export async function fetchAuthBootstrap(): Promise<AuthBootstrap> {
+  const result = await apiRequest<{ required: boolean; registrationAllowed: boolean }>(
+    '/auth/setup-required'
+  );
+  return { setupRequired: result.required, registrationAllowed: result.registrationAllowed };
+}
+
+/**
+ * Samoobslužná registrace (FR-AUTH-08). Odpověď nese session cookie, takže je
+ * uživatel po ní rovnou přihlášený — stejně jako po `setupAdmin`.
+ */
+export async function register(
+  userName: string,
+  displayName: string,
+  password: string
+): Promise<CurrentUser> {
+  return apiRequest<CurrentUser>('/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ userName, displayName, password }),
+  });
 }
 
 export async function setupAdmin(

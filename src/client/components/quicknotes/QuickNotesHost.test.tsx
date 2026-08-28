@@ -5,6 +5,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { QuickNotesHost } from './QuickNotesHost';
+import { useOpenPanel } from '../../hooks/useOpenPanel';
 import { useQuickNotes } from '../../hooks/useQuickNotes';
 import * as quickNotesApi from '../../api/quickNotesApi';
 import * as projectsApi from '../../api/projectsApi';
@@ -38,11 +39,22 @@ function projectSummary(overrides: Partial<ProjectSummary> = {}): ProjectSummary
   };
 }
 
-// Sama komponenta žádné vlastní props nemá — data (`useQuickNotes`) si drží
-// stejně jako AuthenticatedApp, aby test odpovídal skutečnému zapojení.
+// Data (`useQuickNotes`) i otevřenost panelu drží volající, stejně jako
+// v `AuthenticatedApp` — otevřenost je společná pro oba panely (`useOpenPanel`),
+// takže si ji host nesmí držet sám.
 function Harness({ activeProjectId = 'p1' as string | null } = {}) {
   const notes = useQuickNotes();
-  return <QuickNotesHost notes={notes} activeProjectId={activeProjectId} onConvert={vi.fn()} />;
+  const panel = useOpenPanel();
+  return (
+    <QuickNotesHost
+      notes={notes}
+      activeProjectId={activeProjectId}
+      onConvert={vi.fn()}
+      open={panel.open === 'notes'}
+      onToggle={() => panel.toggle('notes')}
+      onClose={panel.close}
+    />
+  );
 }
 
 // Ověřuje FR-QN-01 „dostupný na všech views" — QuickNotesHost nezávisí na
@@ -50,13 +62,21 @@ function Harness({ activeProjectId = 'p1' as string | null } = {}) {
 function ViewSwitchHarness() {
   const [activeView, setActiveView] = useState('gantt');
   const notes = useQuickNotes();
+  const panel = useOpenPanel();
   return (
     <div>
       <div data-testid="active-view">{activeView}</div>
       <button type="button" onClick={() => setActiveView('ukoly')}>
         Přepnout na Úkoly
       </button>
-      <QuickNotesHost notes={notes} activeProjectId="p1" onConvert={vi.fn()} />
+      <QuickNotesHost
+        notes={notes}
+        activeProjectId="p1"
+        onConvert={vi.fn()}
+        open={panel.open === 'notes'}
+        onToggle={() => panel.toggle('notes')}
+        onClose={panel.close}
+      />
     </div>
   );
 }
@@ -68,7 +88,7 @@ afterEach(() => {
 
 describe('QuickNotesHost', () => {
   // @scenario: quick-notes.feature > Otevření Quick Notes panelu
-  it('klik na ikonu "📝 Poznámky" otevře panel jako pravostranný sidebar s nadpisem "Moje poznámky"', async () => {
+  it('klik na ikonu "📝 Poznámky" otevře plovoucí panel s nadpisem "Moje poznámky"', async () => {
     vi.spyOn(quickNotesApi, 'listNotes').mockResolvedValue([]);
     vi.spyOn(projectsApi, 'listProjects').mockResolvedValue([]);
     render(
@@ -84,7 +104,8 @@ describe('QuickNotesHost', () => {
     const panel = await screen.findByRole('dialog', { name: 'Quick Notes' });
     expect(panel).toHaveTextContent('Moje poznámky');
     expect(panel.style.position).toBe('fixed');
-    expect(panel.style.right).toBe('0px');
+    // Plovoucí karta u pravého okraje, ne lišta přilepená ke kraji obrazovky.
+    expect(panel.style.right).toBe('14px');
     // Zbytek stránky (aktuální view) zůstává beze změny.
     expect(screen.getByTestId('view-content')).toHaveTextContent('Harmonogram projektu');
   });
@@ -125,7 +146,7 @@ describe('QuickNotesHost', () => {
     expect(screen.getByTestId('active-view')).toHaveTextContent('ukoly');
     await userEvent.click(screen.getByRole('button', { name: /📝 Poznámky/ }));
 
-    expect(await screen.findByText('Moje poznámky')).toBeInTheDocument();
+    expect(await screen.findByText('📝 Moje poznámky')).toBeInTheDocument();
   });
 
   // @scenario: quick-notes.feature > Quick Notes panel je dostupný i na LandingPage

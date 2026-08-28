@@ -101,3 +101,43 @@ type KbRevisionRow =
         SavedAt: string
         SavedBy: string
     }
+
+/// Řádek tabulky `vault_profiles` — parametry odvození klíče trezoru (ADR-016).
+///
+/// Server tu drží jen to, co potřebuje klient, aby si klíč odvodil sám: sůl,
+/// počet iterací a `Verifier`. Heslo k trezoru sem nikdy nedorazí ani jako
+/// hash — kdyby ano, celý smysl trezoru padá.
+///
+/// `Verifier` je konstanta zašifrovaná odvozeným klíčem. Odemčení je pokus
+/// o její dešifrování: GCM tag selže při špatném hesle, aniž by se sáhlo na
+/// jediný záznam.
+[<CLIMutable>]
+type VaultProfileRow =
+    {
+        UserId: string
+        /// Název odvozovací funkce (dnes vždy `PBKDF2-SHA256`) — kvůli budoucí výměně.
+        Kdf: string
+        Iterations: int
+        Salt: string
+        Verifier: string
+        VerifierIv: string
+        CreatedAt: string
+        UpdatedAt: string
+    }
+
+/// Řádek tabulky `vault_entries` — jeden záznam trezoru jako neprůhledný blob.
+///
+/// `Ciphertext` je AES-256-GCM nad JSONem celého záznamu **včetně názvu**,
+/// takže server nezná ani jména položek. Časy zůstávají v plaintextu: řadí se
+/// podle nich seznam a šifrovat je by znamenalo stáhnout celý trezor jen kvůli
+/// seřazení.
+[<CLIMutable>]
+type VaultEntryRow =
+    {
+        Id: string
+        UserId: string
+        Ciphertext: string
+        Iv: string
+        CreatedAt: string
+        UpdatedAt: string
+    }

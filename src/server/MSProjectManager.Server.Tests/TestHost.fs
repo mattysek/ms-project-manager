@@ -27,7 +27,12 @@ open MSProjectManager.Api.Contracts
 
 /// Server se stejným Program.fs jako v produkci, jen s dočasnou databází
 /// a bez požadavku na HTTPS (testy jezdí po http://localhost).
-type TestApp() =
+/// `settings` přepíše konfiguraci hostitele — pro scénáře, které testují
+/// samo nastavení (např. vypnutou registraci, FR-AUTH-08). Bez argumentu se
+/// server chová jako v produkci s výchozími hodnotami.
+type TestApp(?settings: (string * string) list) =
+    let extraSettings = defaultArg settings []
+
     let databasePath =
         Path.Combine(Path.GetTempPath(), $"msprojectmanager-it-{Guid.NewGuid():N}.db")
 
@@ -41,6 +46,9 @@ type TestApp() =
                 builder.UseSetting("Auth:RequireHttps", "false") |> ignore
                 builder.UseSetting("Actors:PersistIntervalSeconds", "0.3") |> ignore
                 builder.UseSetting("Hub:DetailedErrors", "true") |> ignore
+
+                for key, value in extraSettings do
+                    builder.UseSetting(key, value) |> ignore
 
                 builder.ConfigureLogging(fun logging ->
                     logging.ClearProviders().AddConsole().SetMinimumLevel LogLevel.Warning |> ignore
@@ -79,8 +87,13 @@ type TestApp() =
                     with _ ->
                         ()
 
-/// Odpověď `/auth/setup-required`.
-type SetupState = { Required: bool }
+/// Odpověď `/auth/setup-required` — první spuštění i příznak registrace
+/// (FR-AUTH-08); klient obojí potřebuje ve stejnou chvíli.
+type SetupState =
+    {
+        Required: bool
+        RegistrationAllowed: bool
+    }
 
 /// Tělo odpovědi; `null` je v testu vždycky chyba, ne validní stav.
 let readJson<'T when 'T: not struct and 'T: not null> (response: HttpResponseMessage) =

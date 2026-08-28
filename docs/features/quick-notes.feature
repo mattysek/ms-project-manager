@@ -7,9 +7,41 @@ Feature: Quick Notes — osobní poznámky
 
   Scenario: Otevření Quick Notes panelu
     When "petra.kolarova" klikne na ikonu "📝 Poznámky" v hlavičce
-    Then se otevře Quick Notes panel jako pravostranný sidebar
+    Then se otevře Quick Notes panel jako plovoucí karta vpravo pod horní lištou
     And panel zobrazuje nadpis "Moje poznámky"
     And panel je přístupný bez změny aktuálního view
+
+  Scenario: Panel poznámek vypadá stejně jako trezor
+    # Dřív byly poznámky celovýšková lišta přilepená ke kraji a trezor plovoucí
+    # karta pod lištou — ve stejné aplikaci to vypadalo jako dvě různé. Rám je
+    # proto jeden sdílený a nesmí se znovu rozejít.
+    Given "petra.kolarova" otevře panel poznámek
+    And podívá se na panel trezoru
+    Then mají oba stejný rám, polohu i šířku
+
+  Scenario: Otevřený je vždy jen jeden panel
+    # Oba panely sedí na stejném místě obrazovky, takže dva otevřené se
+    # překrývaly a spodní byl nedosažitelný.
+    Given panel poznámek je otevřený
+    When "petra.kolarova" klikne na tlačítko "Trezor"
+    Then je otevřený trezor
+    And panel poznámek je zavřený
+
+  Scenario: Tlačítko v liště ukazuje, který panel je otevřený
+    Given panel poznámek je otevřený
+    Then tlačítko "Poznámky" je označené jako aktivní
+    And tlačítko "Trezor" označené není
+    When "petra.kolarova" přepne na trezor
+    Then je jako aktivní označené tlačítko "Trezor"
+    And tlačítko "Poznámky" už aktivní není
+
+  Scenario: Uživatelské menu je nad otevřeným panelem
+    # Panely i menu se renderují uvnitř horní lišty, takže o pořadí rozhoduje
+    # z-index uvnitř ní. Když bylo menu níž, panel ho překryl a položky nešly
+    # kliknout — vypadalo to, že menu chybí.
+    Given panel poznámek nebo trezoru je otevřený
+    When "petra.kolarova" rozbalí uživatelské menu
+    Then je menu nad panelem a jeho položky jdou kliknout
 
   Scenario: Zavření Quick Notes panelu
     Given Quick Notes panel je otevřen

@@ -1,5 +1,11 @@
-// Sdílený layout přihlašovacích stránek (Login, Setup) — drží styl konzistentní
-// s LandingPage a nemá logiku, jen rám a společné CSS třídy.
+// Sdílený layout přihlašovacích stránek (Login, Setup, Registrace) — drží styl
+// konzistentní s LandingPage a nemá logiku, jen rám.
+//
+// Třídy si bere z `AppStyles`, aby existovaly jen jednou; vlastní `<style>`
+// blok dopisuje pouze to, čím se přihlašovací stránky vědomě liší — větší
+// vstupní pole, protože je to jediný obsah na obrazovce.
+import { AppStyles } from '../AppStyles';
+
 export function AuthShell({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div
@@ -14,13 +20,11 @@ export function AuthShell({ title, children }: { title: string; children: React.
         padding: 20,
       }}
     >
+      <AppStyles />
+      {/* Jediná vědomá odchylka: na přihlašovací obrazovce je formulář jediný
+          obsah, takže snese větší pole než hustý layout uvnitř aplikace. */}
       <style>{`
-        .inp{background:#0c1018;border:1px solid #1e2533;border-radius:4px;color:#e2e8f0;font-family:inherit;font-size:12px;padding:7px 10px;outline:none}
-        .inp:focus{border-color:#4f9cf9}
-        .btn{cursor:pointer;font-family:inherit;border-radius:6px;font-size:11px;padding:5px 13px;border:1px solid}
-        .auth-label{display:flex;flex-direction:column;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.08em}
-        .auth-error{background:#2a1010;border:1px solid #f8717155;border-radius:6px;padding:8px 12px;font-size:11px;color:#fca5a5}
-        .auth-notice{background:#1a2a3a;border:1px solid #4f9cf955;border-radius:6px;padding:8px 12px;font-size:11px;color:#93c5fd;margin-bottom:12px}
+        .inp{font-size:12px;padding:7px 10px}
       `}</style>
       <div
         style={{

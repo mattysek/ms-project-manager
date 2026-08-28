@@ -13,7 +13,7 @@ Aplikace je určena pro projektové týmy do 15 lidí v korporátním prostřed�
 3. **Role-based access control** — Project Manager má plný přístup; Developer má přístup k vlastním úkolům, kapacitě a osobním nástrojům
 4. **Offline schopnost** — aplikace je použitelná při výpadku sítě; změny se synchronizují při obnovení spojení
 5. **Quick Notes** — nová funkcionalita per-user poznámek přístupná vždy z headeru
-6. **Autentizace** — lokální username/heslo auth, bez veřejné registrace
+6. **Autentizace** — lokální username/heslo auth, se samoobslužnou registrací (lze vypnout konfigurací)
 
 ## Non-goals (první verze)
 
@@ -101,6 +101,16 @@ Dluh na existujícím frontendu se splácí až v [PRD-07](PRD-07-frontend-code-
 - [x] CRUD pro quick notes (markdown, link na projekt, konverze na úkol)
 - [x] REST API pro quick notes (**ne** SignalR — poznámky jsou per-user, viz PRD-04 „Out of scope")
 
+### Fáze 4b — Trezor hesel
+**Cíl:** Osobní úložiště přístupových údajů, šifrované na klientovi
+
+Viz [PRD-09](PRD-09-credential-vault.md) a [ADR-016](../adr/ADR-016-credential-vault.md).
+
+- [x] Panel trezoru v horní liště (vedle Quick Notes, dostupný i bez projektu)
+- [x] Šifrování na klientovi (PBKDF2-SHA256 600k + AES-256-GCM, WebCrypto)
+- [x] REST API pro trezor (**ne** SignalR — `AppState` se broadcastuje členům projektu)
+- [x] Změna hesla trezoru jedním atomickým rekey požadavkem
+
 ### Fáze 5 — Offline podpora
 **Cíl:** Aplikace je použitelná při výpadku sítě
 
@@ -187,6 +197,28 @@ CREATE TABLE quick_notes (
     content TEXT NOT NULL,
     linked_project_id TEXT REFERENCES projects(id) ON DELETE SET NULL,
     converted_to_task_id TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- Trezor hesel (PRD-09, ADR-016). Obsah je šifrovaný na klientovi a server
+-- k němu nemá klíč — drží jen parametry odvození a neprůhledné blobs.
+CREATE TABLE vault_profiles (
+    user_id TEXT PRIMARY KEY REFERENCES AspNetUsers(Id) ON DELETE CASCADE,
+    kdf TEXT NOT NULL,          -- dnes vždy PBKDF2-SHA256
+    iterations INTEGER NOT NULL,
+    salt TEXT NOT NULL,
+    verifier TEXT NOT NULL,     -- konstanta zašifrovaná odvozeným klíčem
+    verifier_iv TEXT NOT NULL,  -- ověření hesla bez dešifrování záznamů
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE vault_entries (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES AspNetUsers(Id) ON DELETE CASCADE,
+    ciphertext TEXT NOT NULL,   -- AES-256-GCM nad celým záznamem včetně názvu
+    iv TEXT NOT NULL,           -- nové pro každý zápis, nikdy se neopakuje
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );

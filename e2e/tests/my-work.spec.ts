@@ -84,6 +84,22 @@ async function projectWithTask(
   return name;
 }
 
+
+/** Pondělí týdne posunutého o `weeks` od dneška, v ISO. */
+function mondayOffsetIso(weeks: number): string {
+  const date = new Date();
+  const dow = date.getDay();
+  date.setDate(date.getDate() - (dow === 0 ? 6 : dow - 1) + weeks * 7);
+  return date.toISOString().slice(0, 10);
+}
+
+/** Pátek téhož týdne — konec projektu nemá padnout na víkend. */
+function fridayOffsetIso(weeks: number): string {
+  const monday = new Date(`${mondayOffsetIso(weeks)}T00:00:00`);
+  monday.setDate(monday.getDate() + 4);
+  return monday.toISOString().slice(0, 10);
+}
+
 test.describe('Moje práce', () => {
   // @scenario: my-work.feature > Úkoly ze všech projektů na jedné obrazovce
   // @scenario: my-work.feature > Úkoly jsou seskupené podle kalendářních týdnů
@@ -218,6 +234,47 @@ test.describe('Moje práce', () => {
     // Přehled je o rozdělané práci, ne o archivu.
     await devPage.getByRole('button', { name: /Obnovit/ }).click();
     await expect(devPage.getByText('Úkol k archivaci')).toHaveCount(0);
+
+    await pmContext.close();
+    await devContext.close();
+  });
+
+  // @scenario: my-work.feature > Přehled začíná na aktuálním týdnu
+  test('přehled se otevře nascrollovaný na aktuální týden', async ({ browser, request }) => {
+    // Tohle je přesně to, co jednotkový test nevidí: jsdom nemá layout a
+    // `scrollIntoView` je v něm jen atrapa, takže „opravdu se to odrolovalo"
+    // jde ověřit jedině v prohlížeči.
+    const pm = await createUser(request, 'Jan Novák');
+    const dev = await createUser(request, 'Petra Kolářová');
+
+    const pmContext = await browser.newContext();
+    const pmPage = await pmContext.newPage();
+    await loginAs(pmPage, pm);
+
+    // Projekt kolem dneška: 12 týdnů zpátky, 13 dopředu. Jeden úkol přes celou
+    // osu vyrobí kartu pro každý týden, takže je stránka opravdu rolovatelná —
+    // s pár úkoly by se nikam scrollovat nemuselo a test by prošel naprázdno.
+    const name = unique('Dlouhy');
+    await createProject(pmPage, name);
+    await setProjectDates(pmPage, mondayOffsetIso(-12), fridayOffsetIso(13));
+    await addMember(pmPage, dev);
+    await addLinkedPerson(pmPage, dev);
+    await addTask(pmPage, { name: 'Dlouhý úkol', from: 1, to: 26, md: 26 });
+    await pmPage.getByRole('button', { name: /← Projekty/ }).click();
+
+    const devContext = await browser.newContext();
+    const devPage = await devContext.newPage();
+    await loginAs(devPage, dev);
+    await devPage.getByRole('button', { name: /Moje práce/ }).click();
+    await expectAfterRefresh(devPage, devPage.getByText('tento týden'));
+
+    // Stránka se odrolovala dolů — nezůstala na začátku seznamu.
+    await expect
+      .poll(() => devPage.evaluate(() => window.scrollY), { timeout: 5000 })
+      .toBeGreaterThan(0);
+
+    // A aktuální týden je vidět, ne někde mimo obrazovku.
+    await expect(devPage.getByText('tento týden')).toBeInViewport();
 
     await pmContext.close();
     await devContext.close();

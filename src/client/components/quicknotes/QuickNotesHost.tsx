@@ -6,7 +6,6 @@
 import { useEffect, useState } from 'react';
 import { listProjects } from '../../api/projectsApi';
 import type { UseQuickNotesResult } from '../../hooks/useQuickNotes';
-import { useQuickNotesPanelOpen } from '../../hooks/useQuickNotesPanelOpen';
 import { QuickNotesButton } from './QuickNotesButton';
 import { QuickNotesPanel } from './QuickNotesPanel';
 import type { QuickNote } from '../../api/quickNotesApi';
@@ -15,10 +14,20 @@ interface QuickNotesHostProps {
   notes: UseQuickNotesResult;
   activeProjectId: string | null;
   onConvert: (note: QuickNote) => void;
+  /** Otevřenost vlastní volající — oba panely sdílí jedno místo (`useOpenPanel`). */
+  open: boolean;
+  onToggle: () => void;
+  onClose: () => void;
 }
 
-export function QuickNotesHost({ notes, activeProjectId, onConvert }: QuickNotesHostProps) {
-  const [open, setOpen] = useQuickNotesPanelOpen();
+export function QuickNotesHost({
+  notes,
+  activeProjectId,
+  onConvert,
+  open,
+  onToggle,
+  onClose,
+}: QuickNotesHostProps) {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   const load = notes.load;
@@ -33,14 +42,14 @@ export function QuickNotesHost({ notes, activeProjectId, onConvert }: QuickNotes
 
   return (
     <>
-      <QuickNotesButton open={open} onToggle={() => setOpen(!open)} />
+      <QuickNotesButton open={open} onToggle={onToggle} />
       {open && (
         <QuickNotesPanel
           notes={notes}
           projects={projects}
           canConvert={!!activeProjectId}
           onConvert={onConvert}
-          onClose={() => setOpen(false)}
+          onClose={onClose}
         />
       )}
     </>

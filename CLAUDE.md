@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```
 build/            build.sh, demo.sh (local run), demo-seed.sh + the five gates
 deploy/           Windows Service installer + deployment README
-docs/             adr/ (15), prd/ (9), features/ (16 .feature files, 306 scenarios)
+docs/             adr/ (16), prd/ (10), features/ (17 .feature files, 344 scenarios)
 src/client/       React 18 + TS + Vite. package.json, biome.json, tsconfig, vite/vitest configs
                   live here; sources sit directly alongside them (components/, hooks/, state/, …)
 src/server/       F# + ASP.NET Core. slnx, Directory.Build.props, fsharplint.json, .config/ here;
@@ -67,7 +67,7 @@ Splitting a file does **not** reduce those findings — the limits apply per fun
 
 ### Acceptance criteria are the Gherkin files
 
-`docs/features/*.feature` holds 306 scenarios that define done. A test claims a scenario with a marker comment — same syntax in TypeScript and F#:
+`docs/features/*.feature` holds 344 scenarios that define done. A test claims a scenario with a marker comment — same syntax in TypeScript and F#:
 
 ```
 // @scenario: auth.feature > Úspěšné přihlášení
@@ -211,11 +211,37 @@ Note the unit-test trap this came from: `fireEvent.click` sets `detail: 0`, i.e.
 
 The bar itself has the same problem for the same reason: `lanes` groups by the **committed** `task.p`, so a task dragged to another person stayed drawn in the source row while the target lit up. `PersonRow` therefore draws a ghost bar in the target row (`ghostFor`) and hides — with `visibility`, not by removing — the original. Hiding rather than removing is load-bearing: dropping the bar out of the source row would shrink it, shift every row below, and change what sits under the cursor, so the drag would oscillate. The ghost keeps the dragged task's `lane` for the same reason.
 
+### Trezor hesel je šifrovaný na klientovi (ADR-016)
+
+`GET/POST /api/vault`, `/api/vault/entries`, `/api/vault/rekey` — per-user REST vedle Quick Notes. Server je tu **úložiště, ne účastník**: `ciphertext` přijde zašifrovaný z prohlížeče a stejně zašifrovaný odejde, heslo k trezoru ani odvozený klíč nikdy neopustí záložku. `Persistence/Repositories/Vault.fs` proto nevaliduje obsah, jen vlastnictví, velikost a počet.
+
+Pár věcí, které z toho plynou a dají se snadno rozbít:
+
+- **Trezor nesmí do command streamu.** `AppState` se broadcastuje všem členům projektu při každém `full_state` (ADR-004) — soukromá hesla by šla rovnou ostatním. Proto REST, stejně jako quick notes a soubory.
+- **Klíč žije jen v `useRef`**, jako `CryptoKey` s `extractable: false`. Nikde se neukládá (žádný `localStorage`, IndexedDB ani `sessionStorage`), takže reload = zamčený trezor. To není nedodělek, to je celý point; E2E `vault.spec.ts` to hlídá.
+- **Zamčení musí zahodit i dešifrované záznamy**, ne jen klíč — jinak je to kosmetika a hesla zůstanou v paměti komponenty.
+- **Nové IV pro každý zápis.** Opakované IV u AES-GCM prozrazuje XOR otevřených textů a láme autentizaci. `encrypt` ho generuje sám, nikdy se nerecykluje.
+- **Odemčení se ověřuje proti `verifier`** (konstanta zašifrovaná odvozeným klíčem), ne proti záznamům — jinak by prázdný trezor nešel odemknout a „špatné heslo" by nešlo odlišit od „poškozená data".
+- **Rekey je jeden atomický požadavek.** Po částech by přerušené spojení nechalo půlku trezoru pod starým a půlku pod novým klíčem, a protože server dovnitř nevidí, nešlo by to ani zjistit, ani spravit. `Vault.rekey` proto čte profil s `AsNoTracking()` — bez toho koliduje sledovaná instance s tou, kterou připojuje `Update`.
+- **Zapomenuté heslo = ztracená data.** Jediné východisko je `DELETE /api/vault`, které heslo záměrně nevyžaduje (server ho stejně nemá jak ověřit).
+
+Co model **nechrání**: aplikaci servíruje ten samý server, takže kdo umí měnit servírovaný JavaScript, umí heslo odchytit. Míří to na data v klidu — ukradenou zálohu, disk, DBA — ne na kompromitovaný server. ADR-016 to říká výslovně, ať se to nepřeceňuje.
+
 ### Cross-project reads (ADR-015)
 
 `GET /api/me/workload` and the deactivation check are the only places that read more than one project. They go through `Projects.listWithStateForUser`, i.e. **straight at `state_json`, deliberately bypassing the actors** — `registry.Get` would wake an actor per project and hold it for `IdleTimeout` to answer a read-only query. The price is staleness: actors persist on a tick (`PersistInterval`, 5 s), so the projection can lag by that much. It is not hidden — the response carries `staleAfterSeconds`, the screen prints it, and there is a manual refresh button. Nothing writes through this path, which is what makes it safe.
 
 The server converts week numbers to real dates here (`Weeks.weekStartIso`), because `Task.S`/`E` index into *their own* project's timeline (ADR-014) and every consumer would otherwise redo that conversion its own way.
+
+### Registrace je samoobslužná, ale vypínatelná (ADR-003, doplněk)
+
+`POST /auth/register` zakládá **běžný** účet (žádná role, žádné členství) a rovnou ho přihlásí. Tři věci se u toho snadno rozbijí:
+
+- **Přepínač platí na serveru.** `Auth:AllowSelfRegistration` (výchozí `true`) čte `Api/Auth.fs` z `IConfiguration` přímo, ne přes `Hosting.Options.AuthOptions` — `Api` se překládá **před** `Hosting`, takže by na ten typ ani nedosáhlo. Při `false` vrací endpoint 403; skrytý odkaz v UI není autorizace. Překlep v hodnotě se čte jako `false`, aby chyba v konfiguraci registraci tiše neotevřela.
+- **Registrace nenahrazuje první spuštění.** Do prázdné databáze patří admin přes `/auth/setup`; dokud neexistuje žádný účet, `register` vrací 409. Bez toho by první příchozí dostal běžný účet a instance by zůstala bez administrátora.
+- **`GET /auth/setup-required` vrací i `registrationAllowed`.** Název už nepokrývá celý obsah, ale cesta zůstává: čeká na ni healthcheck v `e2e/run.sh` a klient obojí potřebuje jedním voláním při startu.
+
+Registrace **prozradí, že jméno je obsazené** — jinak nejde říct, proč založení neprošlo. Opačné pravidlo u přihlášení (FR-AUTH-01, generická hláška) tím není zrušené, jen přestává být neprůstřelné; ADR-003 to říká výslovně.
 
 ### Roles (ADR-006)
 

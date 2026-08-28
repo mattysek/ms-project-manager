@@ -51,7 +51,9 @@ export function UserMenu({ user, role, onLogout, onOpenAdmin }: UserMenuProps) {
           {/* biome-ignore lint/a11y/noStaticElementInteractions: vrstva pro zavření kliknutím mimo, ne interaktivní prvek */}
           <div
             onClick={() => setOpen(false)}
-            style={{ position: 'fixed', inset: 0, zIndex: LAYERS.topBar - 1 }}
+            // Těsně pod menu, tedy i nad otevřeným panelem: klik do panelu
+            // má menu nejdřív zavřít, jako u každého jiného dropdownu.
+            style={{ position: 'fixed', inset: 0, zIndex: LAYERS.userMenu - 1 }}
           />
           <div
             style={{
@@ -63,7 +65,7 @@ export function UserMenu({ user, role, onLogout, onOpenAdmin }: UserMenuProps) {
               border: '1px solid #1e2533',
               borderRadius: 8,
               minWidth: 170,
-              zIndex: LAYERS.topBar + 1,
+              zIndex: LAYERS.userMenu,
               overflow: 'hidden',
             }}
           >

@@ -11,6 +11,7 @@ import { AppStyles } from './AppStyles';
 import { AdminUsersPage } from './admin/AdminUsersPage';
 import { MyWorkPage } from './workload/MyWorkPage';
 import { QuickNotesHost } from './quicknotes/QuickNotesHost';
+import { VaultHost } from './vault/VaultHost';
 import { useNoteConversion } from './quicknotes/useNoteConversion';
 import { useProjectSession } from '../hooks/useProjectSession';
 import { useAppCommands } from '../hooks/appCommands';
@@ -20,6 +21,7 @@ import { useProjectDerivedData } from '../hooks/useProjectDerivedData';
 import { useExportImport } from '../hooks/useExportImport';
 import { useQuickNotes } from '../hooks/useQuickNotes';
 import { useRoute, projectIdFromPath } from '../hooks/useRoute';
+import { useOpenPanel } from '../hooks/useOpenPanel';
 import type { AuthenticatedAuth } from '../hooks/useAuth';
 
 const LOADING_STYLE = {
@@ -160,6 +162,9 @@ export function AuthenticatedApp({ auth }: AuthenticatedAppProps) {
   const [view, setView] = useState<ViewType>('projekt');
   const nav = useAppNavigation(route, setCurrentProjectId, setView, auth);
   const notes = useQuickNotes();
+  // Otevřenost obou plovoucích panelů na jednom místě — sedí na stejné pozici,
+  // takže smí být otevřený jen jeden.
+  const panel = useOpenPanel();
 
   const ws = useWorkspaceData({ currentProjectId, view, userId: auth.user?.userId, notes });
   const { session, commands, project, derived, exportImport, conversion } = ws;
@@ -167,9 +172,7 @@ export function AuthenticatedApp({ auth }: AuthenticatedAppProps) {
   // Přehled napříč projekty stojí mimo projekt (PRD-08), takže i mimo
   // `ProjectWorkspace` — vlastní cesta, ne desátá záložka.
   if (route.path.startsWith('/moje-prace')) {
-    return (
-      <MyWorkPage onBack={() => route.navigate('/')} onOpenTask={nav.loadProjectTask} />
-    );
+    return <MyWorkPage onBack={() => route.navigate('/')} onOpenTask={nav.loadProjectTask} />;
   }
 
   if (route.path.startsWith('/admin/users')) {
@@ -195,6 +198,16 @@ export function AuthenticatedApp({ auth }: AuthenticatedAppProps) {
             notes={notes}
             activeProjectId={currentProjectId}
             onConvert={conversion.requestConvert}
+            open={panel.open === 'notes'}
+            onToggle={() => panel.toggle('notes')}
+            onClose={panel.close}
+          />
+        }
+        vault={
+          <VaultHost
+            open={panel.open === 'vault'}
+            onToggle={() => panel.toggle('vault')}
+            onClose={panel.close}
           />
         }
       />

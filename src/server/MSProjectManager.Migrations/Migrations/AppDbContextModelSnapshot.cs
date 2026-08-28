@@ -326,6 +326,89 @@ namespace MSProjectManager.Migrations.Migrations
                     b.ToTable("quick_notes", (string)null);
                 });
 
+            modelBuilder.Entity("MSProjectManager.Persistence.Entities+VaultEntryRow", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("id");
+
+                    b.Property<string>("Ciphertext")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("ciphertext");
+
+                    b.Property<string>("CreatedAt")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Iv")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("iv");
+
+                    b.Property<string>("UpdatedAt")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("UserId");
+
+                    b.ToTable("vault_entries", (string)null);
+                });
+
+            modelBuilder.Entity("MSProjectManager.Persistence.Entities+VaultProfileRow", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasColumnType("TEXT")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("CreatedAt")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("created_at");
+
+                    b.Property<int>("Iterations")
+                        .HasColumnType("INTEGER")
+                        .HasColumnName("iterations");
+
+                    b.Property<string>("Kdf")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("kdf");
+
+                    b.Property<string>("Salt")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("salt");
+
+                    b.Property<string>("UpdatedAt")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("Verifier")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("verifier");
+
+                    b.Property<string>("VerifierIv")
+                        .IsRequired()
+                        .HasColumnType("TEXT")
+                        .HasColumnName("verifier_iv");
+
+                    b.HasKey("UserId");
+
+                    b.ToTable("vault_profiles", (string)null);
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>
                 {
                     b.Property<string>("Id")
@@ -509,6 +592,24 @@ namespace MSProjectManager.Migrations.Migrations
                         .HasForeignKey("LinkedProjectId")
                         .OnDelete(DeleteBehavior.SetNull);
 
+                    b.HasOne("MSProjectManager.Persistence.Entities+AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MSProjectManager.Persistence.Entities+VaultEntryRow", b =>
+                {
+                    b.HasOne("MSProjectManager.Persistence.Entities+AppUser", null)
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("MSProjectManager.Persistence.Entities+VaultProfileRow", b =>
+                {
                     b.HasOne("MSProjectManager.Persistence.Entities+AppUser", null)
                         .WithMany()
                         .HasForeignKey("UserId")

@@ -60,6 +60,14 @@ projekty.
 - Bez přiřazené práce se ukáže, že osobu musí PM v Kapacitě spárovat s účtem
   (FR-ROLE-07) — bez toho uživatel nemá „vlastní" nic a přehled by mlčel
 
+### FR-WORK-07: Přehled začíná na aktuálním týdnu
+- Po otevření je obrazovka posunutá na **aktuální týden**, ne na začátek seznamu
+- Aktuální týden je v seznamu vizuálně označený („tento týden"), aby byl posun srozumitelný
+- Když v aktuálním týdnu není žádná práce, posune se na **nejbližší příští** týden s prací; když je všechno v minulosti, na poslední
+- Posun se děje **jednou za otevření obrazovky**. Ruční „Obnovit" uživatele nevrací zpátky — přehled se obnovuje často a odrolovaného uživatele by to pokaždé vytrhlo z místa, kam se prokoukal
+
+> **Proč to je potřeba:** seznam obsahuje i týdny, které už jsou za námi (nedokončený úkol z minulého měsíce v něm zůstává), takže bez posunu uživatel přistane na nejstarší rozdělané práci a k dnešku se musí prorolovat.
+
 ## Non-funkcionální požadavky
 
 - Jeden REST dotaz, žádné probouzení actorů (ADR-015)

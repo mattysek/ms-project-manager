@@ -133,6 +133,9 @@ Feature: Autentizace uživatelů
     And existující data uživatele (úkoly, poznámky) jsou zachována
 
   Scenario: První spuštění — vytvoření admin účtu
+    # Formulář tu dřív po odeslání zůstával viset: účet se založil a session
+    # platila, ale brána si "setup je potřeba" načetla jen jednou při startu
+    # a nikdy ho nepřepnula. Navenek to vypadalo, že tlačítko nereaguje.
     Given aplikace je spuštěna s prázdnou databází
     When uživatel přejde na hlavní URL
     Then je přesměrován na "/setup"
@@ -140,7 +143,87 @@ Feature: Autentizace uživatelů
     When zadá uživatelské jméno "admin", display name "Administrátor", heslo "Admin5678"
     And klikne "Vytvořit"
     Then je automaticky přihlášen jako admin
+    And formulář prvního spuštění zmizí
+    And je přesměrován na stránku se seznamem projektů na URL "/"
+
+  Scenario: Probíhající vytváření admin účtu je vidět na tlačítku
+    Given aplikace je spuštěna s prázdnou databází a uživatel je na "/setup"
+    When vyplní formulář a klikne "Vytvořit"
+    Then tlačítko změní popisek na "Vytvářím účet…"
+    And tlačítko je nedostupné, dokud operace probíhá
+
+  Scenario: Neúspěšné vytvoření admin účtu ponechá uživatele na formuláři
+    Given aplikace je spuštěna s prázdnou databází a uživatel je na "/setup"
+    When zadá heslo "kr" a klikne "Vytvořit"
+    Then je zobrazena chybová zpráva
+    And formulář "Vytvoření administrátorského účtu" je stále zobrazen
+    And tlačítko "Vytvořit" je znovu dostupné pro další pokus
+
+  Scenario: Po dokončeném setupu se obrazovka prvního spuštění už nenabízí
+    Given admin účet už v databázi existuje
+    When nepřihlášený uživatel přejde na "/setup"
+    Then je zobrazena přihlašovací stránka
+    And formulář "Vytvoření administrátorského účtu" není zobrazen
+
+  Scenario: Registrace nového uživatele
+    Given registrace je povolená
+    And uživatel není přihlášen
+    When na přihlašovací stránce klikne "Zaregistrovat se"
+    And zadá uživatelské jméno "petra.kolarova", display name "Petra Kolářová" a heslo "Heslo1234"
+    And potvrdí heslo "Heslo1234"
+    And klikne "Zaregistrovat se"
+    Then je automaticky přihlášen
     And je přesměrován na stránku se seznamem projektů
+    And nemá práva administrátora
+    And není členem žádného projektu
+
+  Scenario: Registrace s obsazeným uživatelským jménem
+    # Registrace na rozdíl od přihlášení existenci účtu prozradit musí —
+    # jinak nejde říct, proč založení neprošlo (ADR-003, doplněk).
+    Given registrace je povolená
+    When se nový uživatel pokusí zaregistrovat jako "jan.novak"
+    Then je zobrazena chybová zpráva "Uživatelské jméno je již obsazeno"
+    And účet není vytvořen
+
+  Scenario: Registrace s neshodnými hesly
+    Given registrace je povolená
+    When uživatel zadá heslo "Heslo1234" a potvrzení "JineHeslo9"
+    And klikne "Zaregistrovat se"
+    Then je zobrazena chybová zpráva "Hesla se neshodují"
+    And účet není vytvořen
+
+  Scenario: Registrace s krátkým heslem
+    Given registrace je povolená
+    When uživatel zadá heslo "kr" a potvrdí ho
+    And klikne "Zaregistrovat se"
+    Then je zobrazena chybová zpráva "Heslo musí mít alespoň 8 znaků"
+    And účet není vytvořen
+
+  Scenario: Vypnutá registrace nenabízí odkaz
+    Given registrace je vypnutá konfigurací
+    When uživatel přejde na přihlašovací stránku
+    Then odkaz "Zaregistrovat se" není zobrazen
+
+  Scenario: Vypnutá registrace odmítne i přímé volání
+    # Skryté tlačítko není autorizace — rozhoduje server.
+    Given registrace je vypnutá konfigurací
+    When někdo pošle registrační požadavek přímo na server
+    Then je požadavek odmítnut
+    And účet není vytvořen
+
+  Scenario: Registrace do prázdné databáze se odmítne
+    # Do prázdné DB patří admin přes první spuštění (FR-AUTH-07). Jinak by
+    # první příchozí dostal běžný účet a systém by zůstal bez administrátora.
+    Given aplikace je spuštěna s prázdnou databází
+    When někdo se pokusí zaregistrovat
+    Then je registrace odmítnuta
+    And je nabídnuto vytvoření administrátorského účtu
+
+  Scenario: Registrovaný uživatel se po odhlášení přihlásí svým heslem
+    Given "petra.kolarova" se právě zaregistrovala s heslem "Heslo1234"
+    When se odhlásí
+    And přihlásí se jménem "petra.kolarova" a heslem "Heslo1234"
+    Then je přihlášena
 
   Scenario: Deaktivace upozorní na osiřelé úkoly
     # Ne zákaz — lidé z týmu odcházejí a jejich účty se musí dát zavřít.

@@ -37,6 +37,7 @@
     <Compile Include="Persistence/Repositories/QuickNotes.fs" />
     <Compile Include="Persistence/Repositories/AdoCredentials.fs" />
     <Compile Include="Persistence/Repositories/KbRevisions.fs" />
+    <Compile Include="Persistence/Repositories/Vault.fs" />
     <Compile Include="Integration/AdoApiClient.fs" />
     <Compile Include="Integration/AdoBridgeContext.fs" />
     <Compile Include="Integration/AdoBridgeSync.fs" />
@@ -57,6 +58,7 @@
     <Compile Include="Api/FilesApi.fs" />
     <Compile Include="Api/KnowledgeApi.fs" />
     <Compile Include="Api/QuickNotesApi.fs" />
+    <Compile Include="Api/VaultApi.fs" />
     <Compile Include="Api/WorkloadApi.fs" />
     <Compile Include="Hosting/Options.fs" />
     <Compile Include="Hosting/SecurityHeaders.fs" />

@@ -26,6 +26,15 @@ export function AppStyles() {
       input[type=date].inp{cursor:pointer}
       input[type=color]{cursor:pointer}
 
+      /* Popisky a hlášky formulářů. Bydlí tady, ne u přihlašovací stránky:
+         používá je i trezor uvnitř aplikace (PRD-09) a dokud byly schované
+         v <style> bloku AuthShellu, neexistovaly tam — popisky se pak
+         vykreslily jako holý text prohlížeče. Přesně ten případ, kvůli
+         kterému tenhle soubor vznikl. */
+      .auth-label{display:flex;flex-direction:column;font-size:10px;color:#64748b;text-transform:uppercase;letter-spacing:.08em}
+      .auth-error{background:#2a1010;border:1px solid #f8717155;border-radius:6px;padding:8px 12px;font-size:11px;color:#fca5a5}
+      .auth-notice{background:#1a2a3a;border:1px solid #4f9cf955;border-radius:6px;padding:8px 12px;font-size:11px;color:#93c5fd;margin-bottom:12px}
+
         .markdown-content a {
           color: #4f9cf9;
           text-decoration: underline;

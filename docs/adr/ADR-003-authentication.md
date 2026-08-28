@@ -10,7 +10,7 @@ Aplikace přechází z lokálního single-user nástroje na síťový nástroj p
 Požadavky:
 - Bezpečné uložení hesel (hash + salt)
 - Session management (přihlášení přetrvá po reload stránky)
-- Žádná veřejná registrace — účty vytváří PM nebo admin
+- Žádná veřejná registrace — účty vytváří PM nebo admin *(revidováno 2026-08-28, viz doplněk o samoobslužné registraci)*
 - Jednoduchost: nepoužívat složité OAuth/OIDC pro interní nástroj
 
 ## Rozhodnutí
@@ -122,3 +122,21 @@ odeslat cross-site formulářem — blokuje to výhradně ten jeden atribut.
 ### Nasazení
 
 `AllowedHosts` je v repozitáři `"*"`. Při nasazení se nastavuje na hostname VM.
+
+## Doplněk (2026-08-28): samoobslužná registrace
+
+Původní kontext výše říká „žádná veřejná registrace — účty vytváří PM nebo admin". **To už neplatí.** Zakládání účtů administrátorem se v provozu ukázalo jako zbytečné úzké hrdlo: nový člověk musí počkat, až se k tomu někdo s právy dostane, a admin přitom jen opíše jméno a vymyslí dočasné heslo, které si uživatel stejně hned změní. Žádné rozhodnutí se u toho nedělá.
+
+**Nové rozhodnutí: kdokoli si může založit účet sám, přes `POST /auth/register`, a registrace se dá vypnout konfigurací.**
+
+- `Auth:AllowSelfRegistration`, **výchozí `true`**. Nasazení, které registraci nechce, ji vypne jedním přepínačem.
+- Přepínač platí **na serveru**, ne jen v UI: při `false` vrací endpoint 403, ne jen zmizí odkaz. Skrytá tlačítka nejsou autorizace.
+- Registrovaný účet dostane **běžná práva**: žádná role admina, žádné členství v projektu. Po přihlášení vidí prázdný seznam projektů, dokud si nějaký nezaloží nebo ho někdo nepřidá do svého.
+- Registrace **nenahrazuje první spuštění** (FR-AUTH-07). Do prázdné databáze pořád patří admin přes `/auth/setup`; dokud žádný účet neexistuje, `POST /auth/register` vrací 409. Jinak by první příchozí dostal obyčejný účet a aplikace by zůstala bez administrátora.
+- Zakládání účtů adminem (FR-AUTH-05) **zůstává**. Je to pořád cesta, jak založit účet někomu, kdo se k formuláři nedostane, a jak rovnou nastavit display name.
+
+### Co to stojí
+
+Registrace ze své podstaty **prozradí, že uživatelské jméno je obsazené** — jinak by se nedalo říct, proč založení neprošlo. Přihlášení má na to opačné pravidlo (FR-AUTH-01: generická hláška, ať se neprozradí existence účtu) a to pravidlo dál platí; jen si nemůžeme namlouvat, že výčet jmen je po zapnuté registraci pořád neproveditelný. Pro interní nástroj s lockoutem na heslech je to přijatelná cena. Nasazení, kterému nevyhovuje, má přepínač.
+
+Registrace je taky jediný anonymní endpoint, který **zapisuje do databáze**. Sedí proto vedle `/auth/login` za stejným rate-limitem prohlížeče a stejnou validací hesla (min. 8 znaků, Identity), a nedělá nic dražšího než jedno `CreateAsync`.

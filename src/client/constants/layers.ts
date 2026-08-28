@@ -18,8 +18,24 @@ export const LAYERS = {
   /** Horní lišta aplikace: nad obsahem, pod vším, co obsah překrývá. */
   topBar: 4000,
 
-  /** Plovoucí panel Quick Notes — nad obsahem i lištou, ale pod dialogy. */
-  quickNotes: 5000,
+  /**
+   * Plovoucí panely v horní liště (Quick Notes, Trezor) — nad obsahem
+   * i lištou, ale pod dialogy.
+   *
+   * Jméno je obecné schválně: panely jsou dva a chovají se stejně, takže
+   * vázat vrstvu na jeden z nich by svádělo k tomu dát druhému vlastní číslo.
+   */
+  floatingPanel: 5000,
+
+  /**
+   * Rozbalené uživatelské menu v liště — **nad** plovoucími panely.
+   *
+   * Panely i menu se renderují uvnitř `TopBar`, takže o pořadí rozhoduje
+   * z-index v jeho stacking kontextu, ne globální hodnota lišty. Dokud mělo
+   * menu jen `topBar + 1`, otevřený trezor ho překryl a „Změna hesla" nešla
+   * kliknout — vypadalo to, že menu chybí, přitom bylo jen pod panelem.
+   */
+  userMenu: 5500,
 
   /**
    * Celoobrazovkové překryvy (náhled souboru, detail úkolu, historie KB,

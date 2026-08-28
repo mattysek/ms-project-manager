@@ -20,6 +20,18 @@ type SetupRequest =
         Password: string
     }
 
+/// Samoobslužná registrace (FR-AUTH-08). Tvar odpovídá `SetupRequest`, ale
+/// je to vědomě vlastní typ: setup zakládá **admina** do prázdné databáze,
+/// registrace běžný účet do rozběhnutého systému. Sloučit je by znamenalo, že
+/// změna jednoho tiše mění i to druhé.
+[<CLIMutable>]
+type RegisterRequest =
+    {
+        UserName: string
+        DisplayName: string
+        Password: string
+    }
+
 [<CLIMutable>]
 type ChangePasswordRequest =
     {
@@ -180,4 +192,61 @@ type WorkloadResponse =
         /// Zpoždění projekce v sekundách — kolik může být přehled pozadu.
         StaleAfterSeconds: int
         Tasks: MyTaskResponse list
+    }
+
+// ── Trezor hesel (PRD-09, ADR-016) ──────────────────────────────────────────
+
+/// Parametry odvození klíče. Server je jen ukládá a vrací — heslo k trezoru
+/// ani odvozený klíč sem nikdy nedorazí.
+[<CLIMutable>]
+type CreateVaultRequest =
+    {
+        Kdf: string
+        Iterations: int
+        Salt: string
+        Verifier: string
+        VerifierIv: string
+    }
+
+/// Stav trezoru pro klienta. `Exists = false` znamená „ještě není založený",
+/// a pak jsou ostatní pole prázdná.
+type VaultProfileResponse =
+    {
+        Exists: bool
+        Kdf: string
+        Iterations: int
+        Salt: string
+        Verifier: string
+        VerifierIv: string
+    }
+
+/// Zašifrovaný záznam. `Id` volí klient, stejně jako u quick notes.
+[<CLIMutable>]
+type VaultEntryRequest =
+    {
+        Id: string | null
+        Ciphertext: string
+        Iv: string
+    }
+
+type VaultEntryResponse =
+    {
+        Id: string
+        Ciphertext: string
+        Iv: string
+        CreatedAt: string
+        UpdatedAt: string
+    }
+
+/// Změna hesla trezoru — nový profil plus všechny přešifrované záznamy
+/// v jednom požadavku, protože se musí zapsat atomicky (ADR-016).
+[<CLIMutable>]
+type RekeyVaultRequest =
+    {
+        Kdf: string
+        Iterations: int
+        Salt: string
+        Verifier: string
+        VerifierIv: string
+        Entries: VaultEntryRequest[] | null
     }

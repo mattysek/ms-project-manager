@@ -164,6 +164,60 @@ let private kbRevisions (builder: ModelBuilder) =
     entity.HasOne<ProjectRow>().WithMany().HasForeignKey("ProjectId").OnDelete(DeleteBehavior.Cascade)
     |> ignore
 
+let private vaultProfiles (builder: ModelBuilder) =
+    let entity = builder.Entity<VaultProfileRow>()
+    entity.ToTable "vault_profiles" |> ignore
+    // Jeden trezor na uživatele — proto je klíčem rovnou `user_id`.
+    entity.HasKey(fun row -> row.UserId :> obj) |> ignore
+    entity.Property(fun row -> row.UserId).HasColumnName "user_id" |> ignore
+
+    entity.Property(fun row -> row.Kdf).HasColumnName("kdf").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.Iterations).HasColumnName "iterations" |> ignore
+
+    entity.Property(fun row -> row.Salt).HasColumnName("salt").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.Verifier).HasColumnName("verifier").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.VerifierIv).HasColumnName("verifier_iv").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.CreatedAt).HasColumnName("created_at").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.UpdatedAt).HasColumnName("updated_at").IsRequired()
+    |> ignore
+
+    entity.HasOne<AppUser>().WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade)
+    |> ignore
+
+let private vaultEntries (builder: ModelBuilder) =
+    let entity = builder.Entity<VaultEntryRow>()
+    entity.ToTable "vault_entries" |> ignore
+    entity.HasKey(fun row -> row.Id :> obj) |> ignore
+    entity.Property(fun row -> row.Id).HasColumnName "id" |> ignore
+    entity.Property(fun row -> row.UserId).HasColumnName "user_id" |> ignore
+
+    entity.Property(fun row -> row.Ciphertext).HasColumnName("ciphertext").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.Iv).HasColumnName("iv").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.CreatedAt).HasColumnName("created_at").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.UpdatedAt).HasColumnName("updated_at").IsRequired()
+    |> ignore
+
+    entity.HasIndex("UserId") |> ignore
+
+    entity.HasOne<AppUser>().WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade)
+    |> ignore
+
 /// Kontext aplikace. Identity tabulky si přidá `IdentityDbContext` sám.
 type AppDbContext(options: DbContextOptions<AppDbContext>) =
     inherit IdentityDbContext<AppUser>(options)
@@ -174,6 +228,8 @@ type AppDbContext(options: DbContextOptions<AppDbContext>) =
     member this.AdoCredentials = this.Set<AdoCredentialRow>()
     member this.QuickNotes = this.Set<QuickNoteRow>()
     member this.KbRevisions = this.Set<KbRevisionRow>()
+    member this.VaultProfiles = this.Set<VaultProfileRow>()
+    member this.VaultEntries = this.Set<VaultEntryRow>()
 
     override _.OnModelCreating(builder: ModelBuilder) =
         base.OnModelCreating builder
@@ -183,3 +239,5 @@ type AppDbContext(options: DbContextOptions<AppDbContext>) =
         adoCredentials builder
         quickNotes builder
         kbRevisions builder
+        vaultProfiles builder
+        vaultEntries builder

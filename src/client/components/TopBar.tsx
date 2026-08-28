@@ -17,6 +17,9 @@ interface TopBarProps {
   onLogout: () => void;
   onOpenAdmin: () => void;
   quickNotes: ReactNode;
+  /** Trezor hesel (PRD-09) — vedle poznámek, ze stejného důvodu: musí být
+      dostupný i na LandingPage bez otevřeného projektu. */
+  vault: ReactNode;
 }
 
 /**
@@ -29,7 +32,7 @@ interface TopBarProps {
  */
 export const TOP_BAR_HEIGHT = 48;
 
-export function TopBar({ user, role, onLogout, onOpenAdmin, quickNotes }: TopBarProps) {
+export function TopBar({ user, role, onLogout, onOpenAdmin, quickNotes, vault }: TopBarProps) {
   return (
     <div
       style={{
@@ -50,6 +53,7 @@ export function TopBar({ user, role, onLogout, onOpenAdmin, quickNotes }: TopBar
         gap: 8,
       }}
     >
+      {vault}
       {quickNotes}
       <UserMenu user={user} role={role} onLogout={onLogout} onOpenAdmin={onOpenAdmin} />
     </div>

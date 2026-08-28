@@ -33,6 +33,9 @@ let private mapAnonymous (app: IEndpointRouteBuilder) =
     app.MapPost("/auth/login", handler Auth.login) |> ignore
     app.MapGet("/auth/setup-required", handler Auth.setupRequired) |> ignore
     app.MapPost("/auth/setup", handler Auth.setup) |> ignore
+    // Registrace je jediný anonymní endpoint, který zapisuje do DB — smí ji
+    // vypnout konfigurace, což si hlídá sám handler (FR-AUTH-08).
+    app.MapPost("/auth/register", handler Auth.register) |> ignore
 
 let private mapAuth (app: IEndpointRouteBuilder) =
     app.MapPost("/auth/logout", handler Auth.logout).RequireAuthorization()
@@ -90,6 +93,21 @@ let private mapQuickNotes (app: IEndpointRouteBuilder) =
     secured (app.MapPatch("/api/quick-notes/{id}", withId QuickNotesApi.update))
     secured (app.MapDelete("/api/quick-notes/{id}", withId QuickNotesApi.delete))
 
+/// Trezor hesel (PRD-09). Všechno je per-user; vlastníka řeší `VaultApi`.
+let private mapVault (app: IEndpointRouteBuilder) =
+    let secured (builder: RouteHandlerBuilder) =
+        builder.RequireAuthorization() |> ignore
+
+    secured (app.MapGet("/api/vault", handler VaultApi.profile))
+    secured (app.MapPost("/api/vault", handler VaultApi.create))
+    secured (app.MapDelete("/api/vault", handler VaultApi.deleteVault))
+    secured (app.MapPost("/api/vault/rekey", handler VaultApi.rekey))
+
+    secured (app.MapGet("/api/vault/entries", handler VaultApi.list))
+    secured (app.MapPost("/api/vault/entries", handler VaultApi.createEntry))
+    secured (app.MapPut("/api/vault/entries/{id}", withId VaultApi.updateEntry))
+    secured (app.MapDelete("/api/vault/entries/{id}", withId VaultApi.deleteEntry))
+
 /// Namapuje celé API i SignalR hub.
 let map (app: WebApplication) =
     mapAnonymous app
@@ -98,4 +116,5 @@ let map (app: WebApplication) =
     mapProjects app
     mapFiles app
     mapQuickNotes app
+    mapVault app
     app.MapHub<ProjectHub>("/hubs/project") |> ignore

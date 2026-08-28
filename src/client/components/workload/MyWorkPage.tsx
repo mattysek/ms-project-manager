@@ -4,6 +4,7 @@
 // `Person.weekAlloc` i úkoly žijí uvnitř jednoho projektu. Kdo je na třech
 // projektech po 100 %, není v žádném z nich přetížený — a přitom nemá šanci to
 // stihnout. Tohle je jediné místo, kde je to vidět.
+import { useEffect, useRef } from 'react';
 import type { MyTask } from '../../api/workloadApi';
 import { AppStyles } from '../AppStyles';
 import { formatCzechDate } from '../../utils/reminders';
@@ -72,13 +73,27 @@ function TaskRow({ task, onOpen }: { task: MyTask; onOpen: () => void }) {
 
 function WeekCard({
   bucket,
+  isCurrent,
+  cardRef,
   onOpen,
 }: {
   bucket: WeekBucket;
+  isCurrent: boolean;
+  /** Nastaví se jen u týdne, na který se scrolluje (FR-WORK-07). */
+  cardRef: React.Ref<HTMLDivElement> | undefined;
   onOpen: (task: MyTask) => void;
 }) {
   return (
-    <div style={{ border: '1px solid #1e2533', borderRadius: 10, marginBottom: 14 }}>
+    <div
+      ref={cardRef}
+      style={{
+        // Aktuální týden je zvýrazněný schválně: bez něj by posun seznamu
+        // vypadal jako náhodná pozice a uživatel by nevěděl, kde je.
+        border: isCurrent ? '1px solid #4f9cf9' : '1px solid #1e2533',
+        borderRadius: 10,
+        marginBottom: 14,
+      }}
+    >
       <div
         style={{
           background: '#161b27',
@@ -89,9 +104,23 @@ function WeekCard({
           fontSize: 11,
         }}
       >
-        <span style={{ color: '#94a3b8', fontWeight: 700 }}>
+        <span style={{ color: isCurrent ? '#93c5fd' : '#94a3b8', fontWeight: 700 }}>
           Týden od {formatCzechDate(bucket.mondayIso)}
         </span>
+        {isCurrent && (
+          <span
+            style={{
+              padding: '1px 7px',
+              borderRadius: 8,
+              background: '#0d1f38',
+              border: '1px solid #4f9cf955',
+              color: '#93c5fd',
+              fontSize: 9,
+            }}
+          >
+            tento týden
+          </span>
+        )}
         <span style={{ marginLeft: 'auto', color: loadColor(bucket), fontWeight: 700 }}>
           {bucket.demand} / {bucket.workdays} MD
         </span>
@@ -133,6 +162,18 @@ export function MyWorkPage({ onBack, onOpenTask }: MyWorkPageProps) {
   const workload = useMyWorkload();
   const openTask = (task: MyTask) => onOpenTask(task.projectId, task.taskId);
   const empty = !workload.loading && workload.weeks.length === 0 && workload.undated.length === 0;
+  const focusRef = useRef<HTMLDivElement | null>(null);
+  const scrolled = useRef(false);
+
+  // Posun na aktuální týden se dělá **jen jednou za návštěvu** (FR-WORK-07).
+  // „Obnovit" nesmí uživatele odrolovat zpátky: přehled se čte mimo actory
+  // a obnovuje se často, takže by ho to při každém kliknutí vracelo z místa,
+  // kam se právě prokoukal.
+  useEffect(() => {
+    if (scrolled.current || !workload.focusWeekIso || !focusRef.current) return;
+    scrolled.current = true;
+    focusRef.current.scrollIntoView({ block: 'start' });
+  }, [workload.focusWeekIso]);
 
   return (
     <div style={PAGE_STYLE}>
@@ -152,13 +193,19 @@ export function MyWorkPage({ onBack, onOpenTask }: MyWorkPageProps) {
         {workload.loading && <div style={{ color: '#475569', fontSize: 11 }}>Načítám…</div>}
         {empty && (
           <div style={{ color: '#475569', fontSize: 11 }}>
-            Nemáte přiřazený žádný úkol. Aby se sem úkoly dostaly, musí vás PM v Kapacitě spárovat
-            s osobou (volba „Účet") a přiřadit vám práci.
+            Nemáte přiřazený žádný úkol. Aby se sem úkoly dostaly, musí vás PM v Kapacitě spárovat s
+            osobou (volba „Účet") a přiřadit vám práci.
           </div>
         )}
 
         {workload.weeks.map((bucket) => (
-          <WeekCard key={bucket.mondayIso} bucket={bucket} onOpen={openTask} />
+          <WeekCard
+            key={bucket.mondayIso}
+            bucket={bucket}
+            isCurrent={bucket.mondayIso === workload.currentWeekIso}
+            cardRef={bucket.mondayIso === workload.focusWeekIso ? focusRef : undefined}
+            onOpen={openTask}
+          />
         ))}
         <UndatedSection tasks={workload.undated} onOpen={openTask} />
       </div>

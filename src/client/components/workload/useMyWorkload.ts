@@ -27,6 +27,10 @@ export interface MyWorkload {
   weeks: WeekBucket[];
   /** Úkoly bez rozsahu — projekt bez platných datumů. */
   undated: MyTask[];
+  /** Pondělí aktuálního týdne — podle něj se týden v seznamu zvýrazní. */
+  currentWeekIso: string;
+  /** Týden, na kterém má obrazovka začít; `null`, když není kam scrollovat. */
+  focusWeekIso: string | null;
   reload: () => void;
 }
 
@@ -99,6 +103,25 @@ function bucketize(tasks: MyTask[]): WeekBucket[] {
     .sort((a, b) => a.mondayIso.localeCompare(b.mondayIso));
 }
 
+/**
+ * Týden, na kterém má obrazovka začít (FR-WORK-07).
+ *
+ * Seznam obsahuje i týdny, které už jsou za námi — úkol z minulého měsíce
+ * v něm zůstává, dokud není hotový. Bez posunu by uživatel přistál na nejstarší
+ * rozdělané práci a k dnešku by se musel prorolovat.
+ *
+ * Přednost má aktuální týden. Když v něm nic není, bere se nejbližší **příští**:
+ * kdo se dívá na svou práci, dívá se dopředu. Až když je všechno v minulosti,
+ * padne volba na poslední týden — i to je „nejblíž dnešku".
+ *
+ * Porovnává se jako řetězec, což u `yyyy-mm-dd` odpovídá porovnání dat.
+ */
+function focusWeek(weeks: WeekBucket[], currentWeekIso: string): string | null {
+  if (weeks.length === 0) return null;
+  const upcoming = weeks.find((week) => week.mondayIso >= currentWeekIso);
+  return upcoming ? upcoming.mondayIso : weeks[weeks.length - 1].mondayIso;
+}
+
 export function useMyWorkload(): MyWorkload {
   const [tasks, setTasks] = useState<MyTask[]>([]);
   const [staleAfterSeconds, setStale] = useState(0);
@@ -120,7 +143,8 @@ export function useMyWorkload(): MyWorkload {
         setError(null);
       })
       .catch((err: unknown) => {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Přehled se nepodařilo načíst');
+        if (!cancelled)
+          setError(err instanceof Error ? err.message : 'Přehled se nepodařilo načíst');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -133,12 +157,20 @@ export function useMyWorkload(): MyWorkload {
   const weeks = useMemo(() => bucketize(tasks), [tasks]);
   const undated = useMemo(() => tasks.filter((task) => !task.fromIso), [tasks]);
 
+  // Dnešek se čte jednou při připojení, ne při každém renderu: obrazovka je
+  // krátkodobá a přeskočení půlnoci by jinak uprostřed práce přesunulo
+  // zvýraznění pod rukama.
+  const currentWeekIso = useMemo(() => toISO(weekMonday(new Date())), []);
+  const focusWeekIso = useMemo(() => focusWeek(weeks, currentWeekIso), [weeks, currentWeekIso]);
+
   return {
     loading,
     error,
     staleAfterSeconds,
     weeks,
     undated,
+    currentWeekIso,
+    focusWeekIso,
     reload: useCallback(() => setVersion((value) => value + 1), []),
   };
 }

@@ -30,9 +30,13 @@ Quick Notes jsou per-user markdown poznámky sloužící k zachycení myšlenek,
 
 ### FR-QN-01: Přístup k panelu
 - Quick Notes panel je přístupný z Header — ikona nebo tlačítko "📝 Poznámky" viditelné vždy
-- Panel se otevírá jako floating sidebar vpravo (nezakrývá celý obsah stránky)
+- Panel se otevírá jako **plovoucí karta vpravo pod horní lištou** (nezakrývá celý obsah stránky)
+- Rám panelu (poloha, šířka, orámování, hlavička) je sdílený s trezorem hesel (PRD-09) — jedna komponenta, aby se ty dvě obrazovky nemohly vizuálně rozejít
+- Rozbalené uživatelské menu v liště je **nad** panelem, ne pod ním
 - Panel je dostupný na všech views i na LandingPage (bez otevřeného projektu)
 - Stav panelu (otevřen/zavřen) je persisted v localStorage (ne v DB)
+- **Otevřený je vždy jen jeden plovoucí panel** — poznámky, nebo trezor (PRD-09). Oba sedí na stejném místě obrazovky, takže dva otevřené se překrývají; otevření jednoho ten druhý zavře
+- Tlačítko v liště ukazuje, který panel je otevřený (zvýraznění + `aria-pressed`)
 
 ### FR-QN-02: Zobrazení seznamu poznámek
 - Panel zobrazuje seznam poznámek seřazených sestupně dle `updated_at`

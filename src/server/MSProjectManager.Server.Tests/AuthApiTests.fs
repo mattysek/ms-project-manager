@@ -360,3 +360,147 @@ let ``admin resetuje heslo bez znalosti původního`` () =
             Assert.Equal(HttpStatusCode.Unauthorized, withOld.StatusCode)
         }
     )
+
+// ── Samoobslužná registrace (FR-AUTH-08, ADR-003 doplněk) ───────────────────
+
+/// Registrační požadavek daným klientem.
+let private registerWith (client: HttpClient) (userName: string, displayName: string, password: string) =
+    client.PostAsJsonAsync(
+        "/auth/register",
+        {
+            UserName = userName
+            DisplayName = displayName
+            Password = password
+        }
+    )
+
+/// Server s hotovým setupem — registrace se testuje nad rozběhnutým systémem.
+let private withAdmin (run: TestApp -> Task<unit>) =
+    task {
+        use app = new TestApp()
+        let! _ = setupAdmin app adminName adminPassword
+        do! run app
+    }
+
+// @scenario: auth.feature > Registrace nového uživatele
+[<Fact>]
+let ``registrace založí běžný účet a rovnou přihlásí`` () =
+    withAdmin (fun app ->
+        task {
+            let client = app.CreateClient()
+            let! response = registerWith client ("petra.kolarova", "Petra Kolářová", "Heslo1234")
+
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode)
+            let! current = readJson<CurrentUser> response
+            Assert.Equal("Petra Kolářová", current.DisplayName)
+            // Registrací se nikdo nestává adminem — to je celý rozdíl proti
+            // prvnímu spuštění (FR-AUTH-07).
+            Assert.False current.IsAdmin
+
+            // Odpověď nese cookie, takže je uživatel rovnou přihlášený.
+            let! me = client.GetAsync "/auth/me"
+            Assert.Equal(HttpStatusCode.OK, me.StatusCode)
+
+            // A nemá žádný projekt, dokud si nějaký nezaloží nebo ho někdo nepřidá.
+            let! projects = getJson<ProjectSummaryResponse list> client "/api/projects"
+            Assert.Empty projects
+        }
+    )
+
+// @scenario: auth.feature > Registrovaný uživatel se po odhlášení přihlásí svým heslem
+[<Fact>]
+let ``registrovaný účet funguje i po odhlášení`` () =
+    withAdmin (fun app ->
+        task {
+            let client = app.CreateClient()
+            let! _ = registerWith client ("petra.kolarova", "Petra Kolářová", "Heslo1234")
+            let! _ = client.PostAsync("/auth/logout", null)
+
+            let! session = login app "petra.kolarova" "Heslo1234"
+
+            Assert.Equal("Petra Kolářová", session.User.DisplayName)
+        }
+    )
+
+// @scenario: auth.feature > Registrace s obsazeným uživatelským jménem
+[<Fact>]
+let ``obsazené jméno registraci odmítne`` () =
+    // Na rozdíl od přihlášení registrace existenci účtu prozradit MUSÍ —
+    // jinak nejde říct, proč založení neprošlo (ADR-003, doplněk).
+    withAdmin (fun app ->
+        task {
+            let client = app.CreateClient()
+            let! _ = registerWith client (janName, "Jan Novák", janPassword)
+
+            let second = app.CreateClient()
+            let! response = registerWith second (janName, "Někdo jiný", "JineHeslo9")
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode)
+            let! body = readJson<ApiError> response
+            Assert.Equal("Uživatelské jméno je již obsazeno", body.Message)
+        }
+    )
+
+// @scenario: auth.feature > Registrace s krátkým heslem
+[<Fact>]
+let ``krátké heslo registraci odmítne`` () =
+    withAdmin (fun app ->
+        task {
+            let client = app.CreateClient()
+            let! response = registerWith client ("petra.kolarova", "Petra Kolářová", "kr")
+
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode)
+            let! body = readJson<ApiError> response
+            Assert.Equal(MSProjectManager.Api.Auth.PasswordTooShort, body.Message)
+        }
+    )
+
+// @scenario: auth.feature > Vypnutá registrace odmítne i přímé volání
+[<Fact>]
+let ``vypnutá registrace odmítne i přímé volání`` () =
+    // Skrytý odkaz v UI není autorizace — rozhoduje server.
+    task {
+        use app = new TestApp([ "Auth:AllowSelfRegistration", "false" ])
+        let! _ = setupAdmin app adminName adminPassword
+
+        let client = app.CreateClient()
+        let! response = registerWith client ("petra.kolarova", "Petra Kolářová", "Heslo1234")
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode)
+
+        // A účet opravdu nevznikl.
+        let! attempt = client.PostAsJsonAsync("/auth/login", { UserName = "petra.kolarova"; Password = "Heslo1234" })
+        Assert.Equal(HttpStatusCode.Unauthorized, attempt.StatusCode)
+    }
+
+// @scenario: auth.feature > Vypnutá registrace nenabízí odkaz
+[<Fact>]
+let ``příznak registrace se posílá klientovi`` () =
+    // Klient podle něj skrývá odkaz; hodnota musí odpovídat konfiguraci.
+    task {
+        use enabled = new TestApp()
+        let! zapnuto = getJson<SetupState> (enabled.CreateClient()) "/auth/setup-required"
+        Assert.True zapnuto.RegistrationAllowed
+
+        use disabled = new TestApp([ "Auth:AllowSelfRegistration", "false" ])
+        let! vypnuto = getJson<SetupState> (disabled.CreateClient()) "/auth/setup-required"
+        Assert.False vypnuto.RegistrationAllowed
+    }
+
+// @scenario: auth.feature > Registrace do prázdné databáze se odmítne
+[<Fact>]
+let ``registrace do prázdné databáze se odmítne`` () =
+    // Do prázdné DB patří admin přes `/auth/setup`. Bez téhle pojistky by
+    // první příchozí dostal běžný účet a systém by zůstal bez administrátora.
+    task {
+        use app = new TestApp()
+        let client = app.CreateClient()
+
+        let! response = registerWith client ("petra.kolarova", "Petra Kolářová", "Heslo1234")
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode)
+
+        // Setup je pořád nabízený a pořád funguje.
+        let! state = getJson<SetupState> client "/auth/setup-required"
+        Assert.True state.Required
+    }

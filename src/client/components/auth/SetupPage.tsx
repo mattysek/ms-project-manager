@@ -15,6 +15,8 @@ export function SetupPage({ onCreated }: SetupPageProps) {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // `onCreated` přepne bránu na přihlášenou aplikaci, takže tahle komponenta
+  // se odmontuje — `setSubmitting(false)` proto patří jen do chybové větve.
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
@@ -24,7 +26,6 @@ export function SetupPage({ onCreated }: SetupPageProps) {
       onCreated(user);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Vytvoření účtu se nezdařilo');
-    } finally {
       setSubmitting(false);
     }
   };
@@ -79,7 +80,7 @@ export function SetupPage({ onCreated }: SetupPageProps) {
             fontSize: 12,
           }}
         >
-          Vytvořit
+          {submitting ? 'Vytvářím účet…' : 'Vytvořit'}
         </button>
       </form>
     </AuthShell>

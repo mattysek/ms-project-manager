@@ -37,3 +37,11 @@ afterEach(() => {
 if (typeof document.elementFromPoint !== 'function') {
   document.elementFromPoint = () => null;
 }
+
+// jsdom nemá layout, takže neimplementuje ani `scrollIntoView` — volání by
+// spadlo na „is not a function". „Moje práce" ho používá k posunu na aktuální
+// týden (FR-WORK-07); testy si ho mockují a ověřují, že se zavolal nad tím
+// správným prvkem. Že se doopravdy odroluje, ověří až E2E.
+if (typeof Element.prototype.scrollIntoView !== 'function') {
+  Element.prototype.scrollIntoView = () => {};
+}
