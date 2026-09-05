@@ -221,7 +221,9 @@ export function PreviewModal({ preview, onDownload }: PreviewModalProps) {
     >
       {/* Jen zastavení bublání, aby klik uvnitř náhledu nezavřel modal —
           žádná vlastní interakce, tedy ani klávesová obsluha. */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: stopPropagation, ne interakce */}
+      {/* Potlačení je jen jedno: dva `biome-ignore` komentáře za sebou nefungují
+          — platí vždy ten poslední, takže ten první nic nepotlačoval. Na
+          `noStaticElementInteractions` už není potřeba, ten div má `role`. */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents: stopPropagation, ne interakce */}
       <div
         // Ovládání náhledu je vlastní oblast, ne jen řádek s tlačítky —

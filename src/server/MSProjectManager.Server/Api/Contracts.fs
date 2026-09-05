@@ -250,3 +250,61 @@ type RekeyVaultRequest =
         VerifierIv: string
         Entries: VaultEntryRequest[] | null
     }
+
+// ── Vykazování práce (PRD-10, ADR-017) ──────────────────────────────────────
+
+/// Zapisovaný záznam. `Id` volí klient (jako u quick notes a trezoru).
+///
+/// Volitelná pole jsou `| null`, ne `option`: příchozí JSON prochází
+/// serializátorem se `WithSkippableOptionFields`, kde je explicitní `null`
+/// u `option` pole **neplatný vstup**, ne prázdná hodnota. Klient přitom
+/// „bez projektu" přirozeně pošle jako `null`.
+[<CLIMutable>]
+type WorkLogEntryRequest =
+    {
+        Id: string | null
+        Title: string
+        Description: string | null
+        ProjectId: string | null
+        /// ISO 8601; čas určuje klient, server ho jen validuje (ADR-017).
+        StartedAt: string
+        /// `null` = běžící činnost, tedy spuštění stopek.
+        EndedAt: string | null
+        Tags: string[] | null
+    }
+
+/// Zastavení běžících stopek. Okamžik posílá klient — je to čas kliknutí,
+/// ne čas doručení požadavku.
+[<CLIMutable>]
+type StopWorkRequest = { EndedAt: string }
+
+/// Záznam tak, jak ho vidí klient. `option` pole chybí, když nejsou
+/// vyplněná — `endedAt` tedy chybí u běžící činnosti.
+type WorkLogEntryResponse =
+    {
+        Id: string
+        Title: string
+        Description: string
+        ProjectId: string option
+        StartedAt: string
+        EndedAt: string option
+        Tags: string list
+        CreatedAt: string
+        UpdatedAt: string
+    }
+
+/// Odpověď na zápis záznamu.
+///
+/// `StoppedPrevious` nese činnost, kterou start té nové ukončil (FR-WL-03).
+/// Bez ní by se uživateli zastavily stopky za zády a dozvěděl by se to až
+/// z výpisu.
+type WorkLogWriteResponse =
+    {
+        Entry: WorkLogEntryResponse
+        StoppedPrevious: WorkLogEntryResponse option
+    }
+
+/// Odpověď `GET /api/worklog/running`. Obalový záznam, ne holý `null`, ať
+/// má klient co deserializovat i když nic neběží.
+type RunningWorkResponse =
+    { Running: WorkLogEntryResponse option }

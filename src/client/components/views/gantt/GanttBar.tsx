@@ -105,7 +105,14 @@ type BarGeometry = Pick<
   'task' | 'color' | 'isDragging' | 'barS' | 'barE' | 'visible'
 >;
 
-function barStyle({ task, color, isDragging, barS, barE, visible }: BarGeometry): React.CSSProperties {
+function barStyle({
+  task,
+  color,
+  isDragging,
+  barS,
+  barE,
+  visible,
+}: BarGeometry): React.CSSProperties {
   return {
     position: 'absolute',
     left: (barS - 1) * CELL_W + 2,

@@ -46,6 +46,7 @@ function LandingTopBar() {
       role={null}
       onLogout={vi.fn()}
       onOpenAdmin={vi.fn()}
+      worklog={null}
       quickNotes={null}
       vault={
         <VaultHost

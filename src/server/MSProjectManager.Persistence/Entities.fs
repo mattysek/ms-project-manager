@@ -141,3 +141,36 @@ type VaultEntryRow =
         CreatedAt: string
         UpdatedAt: string
     }
+
+/// Řádek tabulky `work_log_entries` — jeden vykázaný úsek práce (PRD-10).
+///
+/// Data jsou striktně per-user (ADR-017): výkaz vidí jen jeho autor, takže
+/// vlastnictví se ověřuje u každé operace a cizí záznam se tváří jako
+/// neexistující — stejné pravidlo jako u quick notes a trezoru.
+///
+/// `EndedAt = null` znamená **běžící stopky**. Takový řádek smí mít uživatel
+/// nejvýš jeden; invariantu drží repozitář, ne klient.
+///
+/// `Tags` je JSON pole v jednom sloupci schválně. Server podle tagů nikdy
+/// nefiltruje ani neagreguje (dělá to klient nad staženým rozsahem), takže
+/// vazební tabulka by nekupovala nic než join navíc.
+///
+/// `ProjectId` je jen štítek: mazání projektu ho nastaví na `null`, protože
+/// odvedená práce se stala i tehdy, když projekt mezitím zmizel.
+[<CLIMutable>]
+type WorkLogEntryRow =
+    {
+        Id: string
+        UserId: string
+        Title: string
+        Description: string
+        ProjectId: string | null
+        /// ISO 8601 UTC. Posílá ho klient, server ho jen validuje (ADR-017).
+        StartedAt: string
+        /// `null` = běžící činnost.
+        EndedAt: string | null
+        /// JSON pole řetězců, např. `["pohotovost","víkend"]`.
+        Tags: string
+        CreatedAt: string
+        UpdatedAt: string
+    }

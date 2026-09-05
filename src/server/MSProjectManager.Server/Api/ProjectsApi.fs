@@ -69,7 +69,10 @@ let private unlinkPersonOf (ctx: HttpContext) (projectId: string) (memberId: str
             }
 
         for person in linked do
-            match! actor.Execute(user, PeopleCmd(UpdatePerson(person.Id, fields))) |> Async.StartAsTask with
+            match!
+                actor.Execute(user, PeopleCmd(UpdatePerson(person.Id, fields)))
+                |> Async.StartAsTask
+            with
             | Ok diffs ->
                 for diff in diffs do
                     do! hub.Clients.Group(groupOf projectId).SendAsync("ReceiveDiff", diff)

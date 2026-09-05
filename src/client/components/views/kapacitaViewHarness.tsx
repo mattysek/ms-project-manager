@@ -111,10 +111,20 @@ export interface RenderKapacitaOptions {
 /** Členové odpovídající `JAN`/`PETRA` — nabídka ve volbě „Účet". */
 export const MEMBERS: Member[] = [
   { userId: 'u-jan', displayName: 'Jan Novák', role: 'pm', joinedAt: '2026-01-05T08:00:00Z' },
-  { userId: 'u-petra', displayName: 'Petra Kolářová', role: 'dev', joinedAt: '2026-01-05T08:00:00Z' },
+  {
+    userId: 'u-petra',
+    displayName: 'Petra Kolářová',
+    role: 'dev',
+    joinedAt: '2026-01-05T08:00:00Z',
+  },
   // Člen bez odpovídající osoby — na něj se dá spárovat nový řádek, aniž by
   // v testu vznikly dvě osoby se stejným jménem.
-  { userId: 'u-tomas', displayName: 'Tomáš Vondráček', role: 'dev', joinedAt: '2026-01-05T08:00:00Z' },
+  {
+    userId: 'u-tomas',
+    displayName: 'Tomáš Vondráček',
+    role: 'dev',
+    joinedAt: '2026-01-05T08:00:00Z',
+  },
 ];
 
 export interface KapacitaHarness {

@@ -64,7 +64,15 @@ describe('useAppLifecycleEffects — odložený import', () => {
     // command se odmítl na vazbě argumentů a z celého ZIPu se neuložilo nic.
     const upload = vi.spyOn(attachments, 'uploadImported').mockResolvedValue([]);
     pendingImport([
-      { id: 'f1', name: 'smlouva.pdf', mimeType: 'application/pdf', size: 10, addedAt: '', note: '', content: '' },
+      {
+        id: 'f1',
+        name: 'smlouva.pdf',
+        mimeType: 'application/pdf',
+        size: 10,
+        addedAt: '',
+        note: '',
+        content: '',
+      },
     ]);
 
     const { dispatched } = renderLifecycle();
@@ -80,7 +88,15 @@ describe('useAppLifecycleEffects — odložený import', () => {
   it('neúspěšné nahrání přílohy se ohlásí', async () => {
     vi.spyOn(attachments, 'uploadImported').mockResolvedValue(['smlouva.pdf']);
     pendingImport([
-      { id: 'f1', name: 'smlouva.pdf', mimeType: 'application/pdf', size: 10, addedAt: '', note: '', content: '' },
+      {
+        id: 'f1',
+        name: 'smlouva.pdf',
+        mimeType: 'application/pdf',
+        size: 10,
+        addedAt: '',
+        note: '',
+        content: '',
+      },
     ]);
 
     const { warnings } = renderLifecycle();

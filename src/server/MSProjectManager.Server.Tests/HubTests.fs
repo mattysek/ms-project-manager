@@ -459,8 +459,7 @@ let ``odebrání člena zruší vazbu jeho osoby na účet`` () =
             // Členství není v `AppState`, takže vazbu nemůže zrušit reducer —
             // dělá to REST vrstva přes actor, aby změna dorazila jako diff.
             let! response =
-                team.Jan.Client.DeleteAsync
-                    $"/api/projects/{team.ProjectId}/members/{team.Petra.User.UserId}"
+                team.Jan.Client.DeleteAsync $"/api/projects/{team.ProjectId}/members/{team.Petra.User.UserId}"
 
             Assert.Equal(System.Net.HttpStatusCode.NoContent, response.StatusCode)
 
@@ -531,9 +530,7 @@ let ``presence v archivovaném projektu funguje dál`` () =
                     jan.Presence
                     |> List.exists (fun entries ->
                         entries
-                        |> List.exists (fun entry ->
-                            entry.DisplayName = "Petra Kolářová" && entry.View = "gantt"
-                        )
+                        |> List.exists (fun entry -> entry.DisplayName = "Petra Kolářová" && entry.View = "gantt")
                     )
                 )
 
@@ -584,8 +581,7 @@ let ``deaktivace upozorní na osiřelé úkoly`` () =
             // (ADR-002), takže bez flushe by viděla prázdný projekt.
             do! team.App.FlushProjects()
 
-            let! response =
-                team.Admin.Client.PostAsync($"/admin/users/{team.Petra.User.UserId}/deactivate", null)
+            let! response = team.Admin.Client.PostAsync($"/admin/users/{team.Petra.User.UserId}/deactivate", null)
 
             Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode)
             let! summary = readJson<UserSummary> response
@@ -603,8 +599,7 @@ let ``deaktivace účtu bez přiřazené práce nic nehlásí`` () =
             do! team.App.FlushProjects()
             let! outsider = createUser team.App team.Admin ("kdosi", "Kdosi Cizí", "Heslo1234")
 
-            let! response =
-                team.Admin.Client.PostAsync($"/admin/users/{outsider.User.UserId}/deactivate", null)
+            let! response = team.Admin.Client.PostAsync($"/admin/users/{outsider.User.UserId}/deactivate", null)
 
             Assert.Equal(System.Net.HttpStatusCode.OK, response.StatusCode)
             let! summary = readJson<UserSummary> response
@@ -764,7 +759,9 @@ let ``full_state_import projde i s payloadem přes výchozí limit SignalR`` () 
             // jako diff — čeká se proto na projevený stav.
             let! applied =
                 waitUntil (fun () ->
-                    let snapshot = jan.FullState team.ProjectId |> Async.AwaitTask |> Async.RunSynchronously
+                    let snapshot =
+                        jan.FullState team.ProjectId |> Async.AwaitTask |> Async.RunSynchronously
+
                     List.length snapshot.KbPages = 40
                 )
 

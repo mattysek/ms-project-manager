@@ -1,9 +1,9 @@
-// Přepínač plovoucího panelu v horní liště — Poznámky a Trezor.
+// Přepínač plovoucího panelu v horní liště — Poznámky, Trezor a Výkazy.
 //
-// Společné ze stejného důvodu jako `FloatingPanel`: obě tlačítka mají říkat
-// totéž („tenhle panel je právě otevřený") a když si to každé kreslilo po
-// svém, nešlo je od sebe odlišit. Otevřený smí být jen jeden (`useOpenPanel`),
-// takže zvýrazněné je vždy nanejvýš jedno.
+// Společné ze stejného důvodu jako `FloatingPanel`: všechna tři tlačítka mají
+// říkat totéž („tenhle panel je právě otevřený") a když si to každé kreslilo
+// po svém, nešlo je od sebe odlišit. Otevřený smí být jen jeden
+// (`useOpenPanel`), takže zvýrazněné je vždy nanejvýš jedno.
 interface PanelToggleButtonProps {
   /** Je panel právě otevřený? */
   active: boolean;
@@ -27,21 +27,16 @@ export function PanelToggleButton({
   return (
     <button
       type="button"
-      className="btn"
+      // `.btn-active` má plnou barvu okraje, ne průhlednou: zapnutý panel má
+      // být poznat na první pohled, ne až po zaostření. Barvy bydlí
+      // v `AppStyles`, aby se ten stav nekreslil v každé liště jinak.
+      className={active ? 'btn btn-active' : 'btn'}
       onClick={onClick}
       // `aria-pressed` je tu to podstatné: přepínač musí i bez barev říct,
       // který panel je zapnutý — odečítači obrazovky i testu.
       aria-pressed={active}
       aria-label={ariaLabel}
       title={title}
-      style={{
-        background: active ? '#0d1f38' : '#161b27',
-        // Plná barva okraje, ne průhledná: aktivní tlačítko má být poznat
-        // na první pohled, ne po zaostření.
-        borderColor: active ? '#4f9cf9' : '#2d3748',
-        color: active ? '#bfdbfe' : '#94a3b8',
-        fontWeight: active ? 700 : 400,
-      }}
     >
       {icon} {label}
     </button>

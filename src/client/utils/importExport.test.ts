@@ -44,7 +44,9 @@ describe('parseImportFile — starší formát exportu', () => {
     const current = {
       _version: 1,
       project: { name: 'Nový projekt' },
-      people: [{ id: 'p1', name: 'Petra', role: 'BE', color: '#34d399', weekAlloc: [], userId: 'u-petra' }],
+      people: [
+        { id: 'p1', name: 'Petra', role: 'BE', color: '#34d399', weekAlloc: [], userId: 'u-petra' },
+      ],
     };
     const parsed = await parseImportFile(jsonFile(current));
 

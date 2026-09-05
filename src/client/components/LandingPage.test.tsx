@@ -103,7 +103,9 @@ describe('LandingPage — vytvoření a otevření projektu', () => {
       summary({ id: 'new-proj', name: 'Mobilní aplikace v2' })
     );
     const onOpenProject = vi.fn();
-    render(<LandingPage onOpenProject={onOpenProject} onOpenMyWork={vi.fn()} />);
+    render(
+      <LandingPage onOpenProject={onOpenProject} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />
+    );
 
     await userEvent.click(await screen.findByText('+ Nový projekt'));
     await userEvent.type(screen.getByPlaceholderText('Název projektu...'), 'Mobilní aplikace v2');
@@ -119,7 +121,9 @@ describe('LandingPage — vytvoření a otevření projektu', () => {
       summary({ id: 'existing', name: 'Backend refaktoring' }),
     ]);
     const onOpenProject = vi.fn();
-    render(<LandingPage onOpenProject={onOpenProject} onOpenMyWork={vi.fn()} />);
+    render(
+      <LandingPage onOpenProject={onOpenProject} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />
+    );
 
     await userEvent.click(await screen.findByText('Backend refaktoring'));
 
@@ -133,7 +137,7 @@ describe('LandingPage — import projektu', () => {
     setBrowserOnline(false);
     vi.spyOn(projectsApi, 'listProjects').mockResolvedValue([]);
     const createSpy = vi.spyOn(projectsApi, 'createProject');
-    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} />);
+    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />);
 
     await userEvent.click(await screen.findByText('⬆ Import...'));
 
@@ -160,7 +164,9 @@ describe('LandingPage — import projektu', () => {
         people: [],
       })
     );
-    render(<LandingPage onOpenProject={onOpenProject} onOpenMyWork={vi.fn()} />);
+    render(
+      <LandingPage onOpenProject={onOpenProject} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />
+    );
 
     await userEvent.click(await screen.findByText('⬆ Import...'));
 
@@ -183,7 +189,9 @@ describe('LandingPage — import projektu', () => {
     );
     const onOpenProject = vi.fn();
     stubFilePicker(await zipImportFile('projekt-s-prilohy.zip'));
-    render(<LandingPage onOpenProject={onOpenProject} onOpenMyWork={vi.fn()} />);
+    render(
+      <LandingPage onOpenProject={onOpenProject} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />
+    );
 
     await userEvent.click(await screen.findByText('⬆ Import...'));
 
@@ -210,7 +218,7 @@ describe('LandingPage — import projektu', () => {
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
       })
     );
-    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} />);
+    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />);
 
     await userEvent.click(await screen.findByText('⬆ Import...'));
 
@@ -235,7 +243,7 @@ describe('LandingPage — obnovení seznamu', () => {
       .mockResolvedValueOnce([])
       .mockResolvedValue([summary({ id: 'novy', name: 'Backend refaktoring' })]);
 
-    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} />);
+    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />);
     await waitFor(() => expect(listSpy).toHaveBeenCalledTimes(1));
     expect(screen.queryByText('Backend refaktoring')).not.toBeInTheDocument();
 
@@ -258,7 +266,7 @@ describe('LandingPage — archiv projektu', () => {
       ]);
     vi.spyOn(projectsApi, 'archiveProject').mockResolvedValue(undefined);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} />);
+    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />);
     await screen.findByText('Starý projekt');
 
     await userEvent.click(screen.getByLabelText('Archivovat — Starý projekt'));
@@ -279,7 +287,7 @@ describe('LandingPage — archiv projektu', () => {
       .mockResolvedValueOnce([archived])
       .mockResolvedValueOnce([summary({ id: 'arch', name: 'Starý projekt' })]);
     vi.spyOn(projectsApi, 'unarchiveProject').mockResolvedValue(undefined);
-    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} />);
+    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />);
 
     await userEvent.click(await screen.findByText(/Archiv \(1\)/));
     await userEvent.click(screen.getByLabelText('Vrátit z archivu — Starý projekt'));
@@ -295,7 +303,7 @@ describe('LandingPage — archiv projektu', () => {
     vi.spyOn(projectsApi, 'listProjects').mockResolvedValue([
       summary({ id: 'live', name: 'Běžící projekt' }),
     ]);
-    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} />);
+    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />);
     await screen.findByText('Běžící projekt');
 
     // Jediná akce u aktivního projektu je archivace. Hlášku
@@ -314,7 +322,7 @@ describe('LandingPage — archiv projektu', () => {
       .mockResolvedValueOnce([archived])
       .mockResolvedValueOnce([]);
     vi.spyOn(projectsApi, 'deleteProject').mockResolvedValue(undefined);
-    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} />);
+    render(<LandingPage onOpenProject={vi.fn()} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />);
 
     await userEvent.click(await screen.findByText(/Archiv \(1\)/));
     await userEvent.click(screen.getByLabelText('Smazat trvale — Starý projekt'));

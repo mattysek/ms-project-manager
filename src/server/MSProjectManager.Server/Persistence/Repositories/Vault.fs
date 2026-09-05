@@ -88,7 +88,10 @@ let private toEntry (row: VaultEntryRow) : VaultEntry =
 
 /// Blob se nedá zkontrolovat na obsah, jen na to, že vůbec je a není přerostlý.
 let private validateBlob (ciphertext: string) (iv: string) =
-    if System.String.IsNullOrWhiteSpace ciphertext || System.String.IsNullOrWhiteSpace iv then
+    if
+        System.String.IsNullOrWhiteSpace ciphertext
+        || System.String.IsNullOrWhiteSpace iv
+    then
         Error "Záznam trezoru musí mít obsah"
     elif ciphertext.Length > MaxCiphertextLength then
         Error $"Záznam trezoru může mít nejvýš {MaxCiphertextLength} znaků"
@@ -167,7 +170,10 @@ let tryGetEntry (db: AppDbContext) (entryId: string) (userId: string) : Async<Va
 let createEntry (db: AppDbContext) (entry: VaultEntryInput) : Async<Result<VaultEntry, string>> =
     async {
         let! profile = tryGetProfile db entry.UserId
-        let! count = db.VaultEntries.CountAsync(fun row -> row.UserId = entry.UserId) |> Async.AwaitTask
+
+        let! count =
+            db.VaultEntries.CountAsync(fun row -> row.UserId = entry.UserId)
+            |> Async.AwaitTask
 
         match profile, validateBlob entry.Ciphertext entry.Iv with
         | None, _ -> return Error "Trezor není založen"
@@ -334,7 +340,10 @@ let deleteVault (db: AppDbContext) (userId: string) : Async<bool> =
         match Option.ofObj profile with
         | None -> return false
         | Some row ->
-            let! entries = db.VaultEntries.Where(fun e -> e.UserId = userId).ToListAsync() |> Async.AwaitTask
+            let! entries =
+                db.VaultEntries.Where(fun e -> e.UserId = userId).ToListAsync()
+                |> Async.AwaitTask
+
             db.VaultEntries.RemoveRange entries |> ignore
             db.VaultProfiles.Remove row |> ignore
             do! saveChanges db

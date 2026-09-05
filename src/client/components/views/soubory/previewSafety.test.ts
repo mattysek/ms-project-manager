@@ -27,7 +27,8 @@ describe('náhled přílohy — sanitizace obsahu', () => {
   it('Word náhled propouští jen sanitizovaný HTML', () => {
     // `mammoth` vrací HTML z .docx a to jde do `dangerouslySetInnerHTML` —
     // jediné, co mezi tím stojí, je `sanitizeHtml`.
-    const fromDocx = '<p>Zpráva</p><script>alert(document.cookie)</script><img src=x onerror=alert(1)>';
+    const fromDocx =
+      '<p>Zpráva</p><script>alert(document.cookie)</script><img src=x onerror=alert(1)>';
 
     const safe = sanitizeHtml(fromDocx);
 
@@ -37,7 +38,8 @@ describe('náhled přílohy — sanitizace obsahu', () => {
   });
 
   it('markdown náhled propouští jen sanitizovaný HTML', () => {
-    const malicious = '# Nadpis\n\n<script>alert(1)</script>\n\n<a href="javascript:alert(1)">klik</a>';
+    const malicious =
+      '# Nadpis\n\n<script>alert(1)</script>\n\n<a href="javascript:alert(1)">klik</a>';
 
     const safe = markdownToHtml(malicious);
 

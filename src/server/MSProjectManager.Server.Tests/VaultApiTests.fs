@@ -120,8 +120,7 @@ let ``uživatel vidí jen vlastní záznamy a cizí nenačte`` () =
             let! foreignDelete = pair.Petra.Client.DeleteAsync $"/api/vault/entries/{janEntry.Id}"
             Assert.Equal(HttpStatusCode.NotFound, foreignDelete.StatusCode)
 
-            let! foreignUpdate =
-                pair.Petra.Client.PutAsJsonAsync($"/api/vault/entries/{janEntry.Id}", blob "utok")
+            let! foreignUpdate = pair.Petra.Client.PutAsJsonAsync($"/api/vault/entries/{janEntry.Id}", blob "utok")
 
             Assert.Equal(HttpStatusCode.NotFound, foreignUpdate.StatusCode)
 
@@ -169,7 +168,11 @@ let ``úprava přepíše blob i IV`` () =
             let! response =
                 pair.Jan.Client.PutAsJsonAsync(
                     $"/api/vault/entries/{entry.Id}",
-                    { Id = null; Ciphertext = "bm92eS1ibG9i"; Iv = "bm92ZS1pdi0xMjM0" }
+                    {
+                        Id = null
+                        Ciphertext = "bm92eS1ibG9i"
+                        Iv = "bm92ZS1pdi0xMjM0"
+                    }
                 )
 
             let! updated = readJson<VaultEntryResponse> response
@@ -220,8 +223,16 @@ let ``rekey vymění profil i všechny záznamy naráz`` () =
                         VerifierIv = "bm92ZS1pdi0xMjM0"
                         Entries =
                             [|
-                                { Id = first.Id; Ciphertext = "cHJlc2lmcm92YW5vLTE="; Iv = "aXYtMS1pdi0xMjM0" }
-                                { Id = second.Id; Ciphertext = "cHJlc2lmcm92YW5vLTI="; Iv = "aXYtMi1pdi0xMjM0" }
+                                {
+                                    Id = first.Id
+                                    Ciphertext = "cHJlc2lmcm92YW5vLTE="
+                                    Iv = "aXYtMS1pdi0xMjM0"
+                                }
+                                {
+                                    Id = second.Id
+                                    Ciphertext = "cHJlc2lmcm92YW5vLTI="
+                                    Iv = "aXYtMi1pdi0xMjM0"
+                                }
                             |]
                     }
                 )
@@ -260,7 +271,14 @@ let ``rekey s cizím id je odmítnut a nic nerozbije`` () =
                         Salt = "cGV0cmEtc29sLTEyMzQ="
                         Verifier = "cGV0cmEtdmVyaWZpZXI="
                         VerifierIv = "aXYtaXYtaXYtaXY="
-                        Entries = [| { Id = janEntry.Id; Ciphertext = "dXRvay1ibG9i"; Iv = "aXYtaXYtaXYtaXY=" } |]
+                        Entries =
+                            [|
+                                {
+                                    Id = janEntry.Id
+                                    Ciphertext = "dXRvay1ibG9i"
+                                    Iv = "aXYtaXYtaXYtaXY="
+                                }
+                            |]
                     }
                 )
 
@@ -299,7 +317,13 @@ let ``rekey bez některého vlastního záznamu je odmítnut`` () =
                         Verifier = "bm92eS12ZXJpZmllcg=="
                         VerifierIv = "bm92ZS1pdi0xMjM0"
                         Entries =
-                            [| { Id = first.Id; Ciphertext = "cHJlc2lmcm92YW5vLTE="; Iv = "aXYtMS1pdi0xMjM0" } |]
+                            [|
+                                {
+                                    Id = first.Id
+                                    Ciphertext = "cHJlc2lmcm92YW5vLTE="
+                                    Iv = "aXYtMS1pdi0xMjM0"
+                                }
+                            |]
                     }
                 )
 

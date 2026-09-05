@@ -69,7 +69,9 @@ const MAX_OCCURRENCES = 500;
  * nesplněný, tedy datum v minulosti, a připomínka je po termínu.
  */
 export function nextOccurrence(reminder: RecurringReminder): Date {
-  const completed = reminder.lastCompleted ? startOfDay(parseLocalDate(reminder.lastCompleted)) : null;
+  const completed = reminder.lastCompleted
+    ? startOfDay(parseLocalDate(reminder.lastCompleted))
+    : null;
   if (!completed) return occurrenceAt(reminder, 0);
 
   for (let index = 0; index < MAX_OCCURRENCES; index++) {

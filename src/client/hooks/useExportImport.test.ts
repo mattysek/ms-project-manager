@@ -46,9 +46,7 @@ describe('useExportImport — export (offline watermark, FR-OFFLINE-07)', () => 
   it('offline export vloží watermark do JSON, ale stáhne soubor jako normálně', async () => {
     const downloaded = captureDownloadedJSON();
     const state = makeAppState({ files: [] });
-    const { result } = renderHook(() =>
-      useExportImport({ state, isOffline: true })
-    );
+    const { result } = renderHook(() => useExportImport({ state, isOffline: true }));
 
     await act(async () => {
       await result.current.exportProject();
@@ -60,9 +58,7 @@ describe('useExportImport — export (offline watermark, FR-OFFLINE-07)', () => 
   it('online export nevkládá watermark', async () => {
     const downloaded = captureDownloadedJSON();
     const state = makeAppState({ files: [] });
-    const { result } = renderHook(() =>
-      useExportImport({ state, isOffline: false })
-    );
+    const { result } = renderHook(() => useExportImport({ state, isOffline: false }));
 
     await act(async () => {
       await result.current.exportProject();
@@ -77,9 +73,7 @@ describe('useExportImport — export bez příloh (project-management.feature)',
   it('bez souborů stáhne .json obsahující tasks/people/risks/milestones/kb/todos, bez ADO PAT', async () => {
     const downloaded = captureDownloadedJSON();
     const state = makeAppState({ files: [] });
-    const { result } = renderHook(() =>
-      useExportImport({ state, isOffline: false })
-    );
+    const { result } = renderHook(() => useExportImport({ state, isOffline: false }));
 
     await act(async () => {
       await result.current.exportProject();
@@ -129,9 +123,7 @@ describe('useExportImport — export se soubory jako ZIP (project-management.fea
       }),
     ];
     const state = makeAppState({ files });
-    const { result } = renderHook(() =>
-      useExportImport({ state, isOffline: false })
-    );
+    const { result } = renderHook(() => useExportImport({ state, isOffline: false }));
 
     await act(async () => {
       await result.current.exportProject();

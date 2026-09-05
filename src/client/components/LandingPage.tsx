@@ -17,6 +17,8 @@ interface LandingPageProps {
   onOpenProject: (projectId: string) => void;
   /** Přehled napříč projekty (PRD-08) — stojí mimo projekt, tedy i mimo záložky. */
   onOpenMyWork: () => void;
+  /** Výkazy práce (PRD-10, FR-WL-11) — tamtéž a ze stejného důvodu. */
+  onOpenWorkLog: () => void;
 }
 
 /**
@@ -109,7 +111,7 @@ function useLanding(onOpenProject: (projectId: string) => void) {
   };
 }
 
-export function LandingPage({ onOpenProject, onOpenMyWork }: LandingPageProps) {
+export function LandingPage({ onOpenProject, onOpenMyWork, onOpenWorkLog }: LandingPageProps) {
   const ui = useLanding(onOpenProject);
   const { projects, archived, loading, error, dismissError, archive, unarchive, remove } = ui.list;
   const { isOffline, notice } = ui;
@@ -146,6 +148,7 @@ export function LandingPage({ onOpenProject, onOpenMyWork }: LandingPageProps) {
           onNew={() => ui.setShowNewForm(true)}
           onImport={ui.importProject}
           onMyWork={onOpenMyWork}
+          onWorkLog={onOpenWorkLog}
         />
 
         {ui.showNewForm && (
@@ -239,70 +242,56 @@ function OfflineBanner() {
   );
 }
 
+/**
+ * Rozcestník úvodní obrazovky.
+ *
+ * Barvy se berou z variant v `AppStyles`, ne z inline hodnot: každé tlačítko
+ * tu dřív mělo vlastní akcent (zelená, modrá, fialová, zelená) a čtyři
+ * rovnocenné akce ve čtyřech barvách vypadaly jako čtyři nesouvisející věci.
+ * Zvýrazněná je proto **jedna** — založení projektu; zbytek je rozcestník.
+ */
 function ActionButtons({
   isOffline,
   onNew,
   onImport,
   onMyWork,
+  onWorkLog,
 }: {
   isOffline: boolean;
   onNew: () => void;
   onImport: () => void;
   onMyWork: () => void;
+  onWorkLog: () => void;
 }) {
   return (
     <div
       style={{
         display: 'flex',
-        gap: 10,
-        marginBottom: 24,
+        gap: 8,
+        marginBottom: 28,
         justifyContent: 'center',
         flexWrap: 'wrap',
       }}
     >
-      <button
-        type="button"
-        className="btn"
-        onClick={onNew}
-        style={{
-          background: '#0d2210',
-          borderColor: '#34d39966',
-          color: '#6ee7b7',
-          padding: '10px 24px',
-          fontSize: 13,
-        }}
-      >
+      <button type="button" className="btn btn-lg btn-primary" onClick={onNew}>
         + Nový projekt
       </button>
+      {/* Offline se tlačítko nezakazuje `disabled`: kliknutí má vysvětlit,
+          proč import nejde (FR-OFFLINE-07), a zakázané tlačítko nekliká. */}
       <button
         type="button"
-        className="btn"
+        className="btn btn-lg"
         onClick={onImport}
         title={isOffline ? 'Import projektu vyžaduje připojení k serveru' : undefined}
-        style={{
-          background: '#161b27',
-          borderColor: '#4f9cf944',
-          color: isOffline ? '#475569' : '#93c5fd',
-          padding: '10px 24px',
-          fontSize: 13,
-          cursor: isOffline ? 'not-allowed' : 'pointer',
-        }}
+        style={isOffline ? { color: '#475569', cursor: 'not-allowed' } : undefined}
       >
         ⬆ Import...
       </button>
-      <button
-        type="button"
-        className="btn"
-        onClick={onMyWork}
-        style={{
-          background: '#161b27',
-          borderColor: '#a78bfa44',
-          color: '#c4b5fd',
-          padding: '10px 24px',
-          fontSize: 13,
-        }}
-      >
+      <button type="button" className="btn btn-lg" onClick={onMyWork}>
         📋 Moje práce
+      </button>
+      <button type="button" className="btn btn-lg" onClick={onWorkLog}>
+        ⏱ Výkazy práce
       </button>
     </div>
   );

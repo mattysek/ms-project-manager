@@ -20,6 +20,8 @@ interface TopBarProps {
   /** Trezor hesel (PRD-09) — vedle poznámek, ze stejného důvodu: musí být
       dostupný i na LandingPage bez otevřeného projektu. */
   vault: ReactNode;
+  /** Rychlé stopky výkazů (PRD-10, FR-WL-10) — tamtéž a ze stejného důvodu. */
+  worklog: ReactNode;
 }
 
 /**
@@ -32,7 +34,15 @@ interface TopBarProps {
  */
 export const TOP_BAR_HEIGHT = 48;
 
-export function TopBar({ user, role, onLogout, onOpenAdmin, quickNotes, vault }: TopBarProps) {
+export function TopBar({
+  user,
+  role,
+  onLogout,
+  onOpenAdmin,
+  quickNotes,
+  vault,
+  worklog,
+}: TopBarProps) {
   return (
     <div
       style={{
@@ -53,6 +63,7 @@ export function TopBar({ user, role, onLogout, onOpenAdmin, quickNotes, vault }:
         gap: 8,
       }}
     >
+      {worklog}
       {vault}
       {quickNotes}
       <UserMenu user={user} role={role} onLogout={onLogout} onOpenAdmin={onOpenAdmin} />

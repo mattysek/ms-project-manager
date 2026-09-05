@@ -71,10 +71,5 @@ let mine (ctx: HttpContext) : Task<IResult> =
             |> List.collect (tasksOf user)
             |> List.sortBy (fun task -> (task.FromIso, task.ProjectName, task.Name))
 
-        return
-            Results.Json
-                {
-                    StaleAfterSeconds = 5
-                    Tasks = tasks
-                }
+        return Results.Json { StaleAfterSeconds = 5; Tasks = tasks }
     }

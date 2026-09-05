@@ -20,10 +20,7 @@ function toFile(imported: ImportedFile): File {
 }
 
 /** Nahraje přílohy; vrací názvy těch, které se nepodařilo uložit. */
-export async function uploadImported(
-  projectId: string,
-  files: ImportedFile[]
-): Promise<string[]> {
+export async function uploadImported(projectId: string, files: ImportedFile[]): Promise<string[]> {
   const failed: string[] = [];
   for (const imported of files) {
     try {

@@ -137,7 +137,10 @@ async function downloadZip(
   triggerDownload(zipBlob, `kapacitni-plan-${slug}.zip`);
 }
 
-export function useExportImport({ state, isOffline }: UseExportImportOptions): UseExportImportResult {
+export function useExportImport({
+  state,
+  isOffline,
+}: UseExportImportOptions): UseExportImportResult {
   const exportProject = useCallback(async () => {
     if (!state) return;
     const slug = slugify(state.project.name);

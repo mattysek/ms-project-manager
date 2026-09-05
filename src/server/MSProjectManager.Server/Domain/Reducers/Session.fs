@@ -5,9 +5,12 @@
 /// čistý, žádné I/O.
 module MSProjectManager.Domain.Reducers.Session
 
+open MSProjectManager.Domain.Types
 open MSProjectManager.Domain.State
 open MSProjectManager.Domain.Commands
 open MSProjectManager.Domain.Diffs
+
+module Weeks = MSProjectManager.Domain.Weeks
 
 /// Aplikuje ADO command.
 ///
@@ -40,6 +43,26 @@ let applyAdo (state: AppState) (command: AdoCommand) : Result<AppState * Project
     | AdoAddGapToPlan _
     | AdoLinkGapToTask _ -> Ok(state, [])
 
+/// Dorovná `WeekAlloc` na počet týdnů importovaného projektu.
+///
+/// Import je jediná cesta, která stav nahrazuje celý a ne po jednom poli,
+/// takže je taky jediná, která umí uložit alokaci kratší, než kolik má
+/// projekt týdnů (`update_project` si délku srovnává sám v `recalculate`).
+/// Navenek to nevypadalo jako poškozená data: klient chybějící týdny dopadá
+/// stovkami, takže se tabulka Kapacity vykreslila celá — ale zapsat do ní
+/// nešlo. Klient mapuje přes uložené pole, nad prázdným seznamem tedy
+/// nevznikne žádná změna a tím ani žádný command, takže procenta jen skákala
+/// zpátky a na server neodešlo nic. Žádná chyba, žádné odmítnutí.
+let private fitPeopleToTimeline (project: Project) (people: Person list) =
+    let weekCount = Weeks.count project.StartDate project.EndDate
+
+    people
+    |> List.map (fun person ->
+        { person with
+            WeekAlloc = Weeks.fitAlloc weekCount person.WeekAlloc
+        }
+    )
+
 /// Import nahrazuje stav projektu. Přílohy zůstávají ty současné — jejich
 /// obsah je v DB a importovaný JSON by nesl jen metadata bez BLOBů (ADR-010).
 /// TODO a připomínky z importu patří tomu, kdo import spustil; cizí soukromé
@@ -48,7 +71,7 @@ let private import (state: AppState) (user: UserContext) (imported: ClientAppSta
     let next =
         { state with
             Project = imported.Project
-            People = imported.People
+            People = fitPeopleToTimeline imported.Project imported.People
             Tasks = imported.Tasks
             Cats = imported.Cats
             Roles = imported.Roles

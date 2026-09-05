@@ -108,6 +108,24 @@ let private mapVault (app: IEndpointRouteBuilder) =
     secured (app.MapPut("/api/vault/entries/{id}", withId VaultApi.updateEntry))
     secured (app.MapDelete("/api/vault/entries/{id}", withId VaultApi.deleteEntry))
 
+/// Vykazování práce (PRD-10). Všechno je per-user; vlastníka bere `WorkLogApi`
+/// z přihlášení, takže tu není žádná projektová autorizace.
+///
+/// `running`, `tags` a `stop` musí být mapované samostatně — cesta
+/// `/api/worklog/{id}` je pokrývá jen tvarem, ne významem. Literální segment
+/// má v routingu přednost před parametrem, takže se nepřebijí.
+let private mapWorkLog (app: IEndpointRouteBuilder) =
+    let secured (builder: RouteHandlerBuilder) =
+        builder.RequireAuthorization() |> ignore
+
+    secured (app.MapGet("/api/worklog", handler WorkLogApi.list))
+    secured (app.MapPost("/api/worklog", handler WorkLogApi.create))
+    secured (app.MapGet("/api/worklog/running", handler WorkLogApi.running))
+    secured (app.MapGet("/api/worklog/tags", handler WorkLogApi.tags))
+    secured (app.MapPost("/api/worklog/stop", handler WorkLogApi.stop))
+    secured (app.MapPut("/api/worklog/{id}", withId WorkLogApi.update))
+    secured (app.MapDelete("/api/worklog/{id}", withId WorkLogApi.delete))
+
 /// Namapuje celé API i SignalR hub.
 let map (app: WebApplication) =
     mapAnonymous app
@@ -117,4 +135,5 @@ let map (app: WebApplication) =
     mapFiles app
     mapQuickNotes app
     mapVault app
+    mapWorkLog app
     app.MapHub<ProjectHub>("/hubs/project") |> ignore

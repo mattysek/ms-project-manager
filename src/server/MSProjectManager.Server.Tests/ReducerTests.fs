@@ -258,6 +258,52 @@ let ``full_state_import nahradí stav, ale ponechá přílohy`` () =
     Assert.Equal<ProjectDiff list>([ FullState(forUser pm.UserId next) ], diffs)
 
 [<Fact>]
+// @scenario: project-management.feature > Import s neúplnou alokací kapacit
+let ``full_state_import dorovná kratší alokaci na počet týdnů`` () =
+    let imported =
+        { forUser pm.UserId state with
+            People =
+                [
+                    { person janPersonId janId "Jan Novák" "AR" with
+                        WeekAlloc = []
+                    }
+                    { person petraPersonId petraId "Petra Kolářová" "BE" with
+                        WeekAlloc = [ 50.0; 60.0 ]
+                    }
+                ]
+        }
+
+    let next, _ = applyPm (SessionCmd(FullStateImport imported)) |> expectOk
+    let weekCount = Weeks.count state.Project.StartDate state.Project.EndDate
+
+    let jan = next.People |> List.find (fun item -> item.Id = janPersonId)
+    Assert.Equal(weekCount, List.length jan.WeekAlloc)
+    Assert.All(jan.WeekAlloc, (fun pct -> Assert.Equal(100.0, pct)))
+
+    // Co v exportu bylo, se zachová — dopadají se jen chybějící týdny.
+    let petra = next.People |> List.find (fun item -> item.Id = petraPersonId)
+    Assert.Equal(weekCount, List.length petra.WeekAlloc)
+    Assert.Equal<float list>([ 50.0; 60.0 ], List.truncate 2 petra.WeekAlloc)
+    Assert.All(List.skip 2 petra.WeekAlloc, (fun pct -> Assert.Equal(100.0, pct)))
+
+[<Fact>]
+let ``full_state_import bez platných datumů alokaci nemaže`` () =
+    // `weekCount = 0` znamená „datumy nejdou přečíst", ne „nula týdnů".
+    // Dorovnání na nulu by alokaci smazalo a příští uložení datumů by ji
+    // vrátilo jako samé stovky — tiše zahozené rozdělení kapacit.
+    let imported =
+        { forUser pm.UserId state with
+            Project =
+                { state.Project with
+                    StartDate = ""
+                    EndDate = ""
+                }
+        }
+
+    let next, _ = applyPm (SessionCmd(FullStateImport imported)) |> expectOk
+    Assert.All(next.People, (fun item -> Assert.Equal(4, List.length item.WeekAlloc)))
+
+[<Fact>]
 let ``undo a redo server odmítne, řeší je klient`` () =
     Assert.Contains("ADR-007", applyPm (SessionCmd Undo) |> expectError)
     Assert.Contains("ADR-007", applyPm (SessionCmd Redo) |> expectError)
@@ -408,6 +454,19 @@ let ``projekt bez platných datumů úkoly neořízne`` () =
     let untouched = List.exactlyOne next.Tasks
     Assert.Equal(3, untouched.S)
     Assert.Equal(5, untouched.E)
+
+[<Fact>]
+let ``projekt bez platných datumů alokace nemaže`` () =
+    // Ze stejného důvodu jako u úkolů: vymazané datum protáhlo `resizeAlloc`
+    // nulou a alokace zmizely všem najednou. Opětovné uložení datumů je
+    // vrátilo jako samé stovky, takže po sobě chyba nenechala ani stopu.
+    let fields =
+        { emptyProjectFields with
+            StartDate = Some ""
+        }
+
+    let next, _ = applyPm (ProjectMetaCmd(UpdateProject fields)) |> expectOk
+    Assert.All(next.People, (fun item -> Assert.Equal(4, List.length item.WeekAlloc)))
 
 [<Fact>]
 let ``změna jiného pole než datumů nepřepočítává`` () =
@@ -579,7 +638,9 @@ let ``PM přiřadí osobě účet`` () =
     let novyClen = "novy.clen"
     let next, diffs = applyPm (linkAccount externistaPersonId novyClen) |> expectOk
 
-    let updated = next.People |> List.find (fun person -> person.Id = externistaPersonId)
+    let updated =
+        next.People |> List.find (fun person -> person.Id = externistaPersonId)
+
     Assert.Equal(novyClen, updated.UserId)
 
     let expected =
@@ -636,7 +697,11 @@ let ``Dev po spárování smí editovat úkol své osoby`` () =
         }
 
     let ownTask = task "t-fe" externistaPersonId
-    let before = { state with Tasks = ownTask :: state.Tasks }
+
+    let before =
+        { state with
+            Tasks = ownTask :: state.Tasks
+        }
 
     // Bez vazby Dev na svůj úkol nesmí.
     let denied =
@@ -646,11 +711,13 @@ let ``Dev po spárování smí editovat úkol své osoby`` () =
 
     // PM osobu spáruje s účtem…
     let linked, _ =
-        applyCommand before pm testNow (linkAccount externistaPersonId "novy.clen") |> expectOk
+        applyCommand before pm testNow (linkAccount externistaPersonId "novy.clen")
+        |> expectOk
 
     // …a od té chvíle Dev projde.
     let after, _ =
-        applyCommand linked externista testNow (TaskCmd(UpdateProgress("t-fe", 40))) |> expectOk
+        applyCommand linked externista testNow (TaskCmd(UpdateProgress("t-fe", 40)))
+        |> expectOk
 
     let updated = after.Tasks |> List.find (fun t -> t.Id = "t-fe")
     Assert.Equal(40, updated.Progress)

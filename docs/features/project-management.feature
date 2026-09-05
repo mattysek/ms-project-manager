@@ -125,6 +125,20 @@ Feature: Správa projektů
     Then se naimportují osoby i všechno ostatní
     And osoby jsou bez přiřazeného účtu, dokud je PM nespáruje
 
+  Scenario: Import s neúplnou alokací kapacit
+    # Alokaci kratší, než kolik má projekt týdnů, umí uložit jedině import —
+    # `update_project` si délku srovnává sám (`recalculate`). Navenek to
+    # nevypadalo jako poškozená data: klient chybějící týdny dopadá stovkami,
+    # takže se tabulka Kapacity vykreslila celá. Zapsat do ní ale nešlo —
+    # klient mapuje přes uložené pole, nad prázdným seznamem tedy nevznikne
+    # žádná změna a tím ani žádný command. Procenta jen skákala zpátky
+    # a na server neodešlo nic, bez chyby a bez odmítnutí.
+    Given "jan.novak" má export, kde osoby mají kratší alokaci než kolik má projekt týdnů
+    When ho naimportuje
+    Then se alokace dorovná na počet týdnů projektu
+    And chybějící týdny mají 100 %
+    And už uložená procenta zůstanou beze změny
+
   Scenario: Import souboru s neplatným formátem
     Given "jan.novak" je na LandingPage
     When klikne na "Importovat projekt"

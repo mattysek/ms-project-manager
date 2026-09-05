@@ -190,11 +190,7 @@ let register (ctx: HttpContext) : Task<IResult> =
                 | None -> return badRequest "Chybí údaje účtu"
                 | Some request ->
                     let user =
-                        AppUser(
-                            UserName = request.UserName,
-                            DisplayName = request.DisplayName,
-                            IsActive = true
-                        )
+                        AppUser(UserName = request.UserName, DisplayName = request.DisplayName, IsActive = true)
 
                     let! created = manager.CreateAsync(user, request.Password)
 

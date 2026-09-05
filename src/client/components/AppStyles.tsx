@@ -19,8 +19,32 @@ export function AppStyles() {
       .inp{background:#0c1018;border:1px solid #1e2533;border-radius:4px;color:#e2e8f0;font-family:inherit;font-size:11px;padding:3px 7px;outline:none;transition:border-color .15s}
       .inp:focus{border-color:#4f9cf9}
       .inp::placeholder{color:#334155}
-      .btn{cursor:pointer;font-family:inherit;border-radius:6px;font-size:11px;padding:5px 13px;transition:all .15s;border:1px solid}
+      /* Pozor: tenhle blok je JS template literal, takže se sem nesmí dostat
+         zpětný apostrof — ukončil by řetězec uprostřed CSS.
+
+         .btn dřív nenastavovala barvy, jen tvar, takže holé class="btn"
+         skončilo s výchozím tlačítkem prohlížeče na tmavé stránce. Nevšimlo
+         se toho, protože všech 160 volajících si barvy posílalo inline;
+         první, kdo je nepředal, dostal cizí prvek. Neutrální varianta je teď
+         výchozí a pojmenované varianty níž jsou přesně ty kombinace, které
+         už po aplikaci kolovaly. Inline style má pořád přednost, takže se tím
+         žádné existující tlačítko nemění. */
+      .btn{cursor:pointer;font-family:inherit;border-radius:6px;font-size:11px;padding:5px 13px;transition:all .15s;border:1px solid;background:#161b27;border-color:#2d3748;color:#94a3b8}
       .btn:hover:not(:disabled){filter:brightness(1.25)}
+      .btn:disabled{opacity:.5;cursor:not-allowed}
+
+      /* Hlavní akce obrazovky — právě jedna. */
+      .btn-primary{background:#0d2210;border-color:#34d39966;color:#6ee7b7}
+      /* Vedlejší akce, která má být přesto vidět (odkaz dál, náhled). */
+      .btn-accent{background:#0c1a2a;border-color:#4f9cf944;color:#93c5fd}
+      /* Nevratná akce. */
+      .btn-danger{background:#2a1010;border-color:#f8717166;color:#f87171}
+      /* Zapnutý přepínač — stejné barvy jako přepínače panelů v horní liště. */
+      .btn-active{background:#0d1f38;border-color:#4f9cf9;color:#bfdbfe;font-weight:700}
+      /* Tlačítko jen s ikonou v hustém řádku. */
+      .btn-icon{padding:3px 8px}
+      /* Rozcestník na úvodní obrazovce. */
+      .btn-lg{font-size:13px;padding:10px 22px}
       .trow:hover td{background:#0f1a2a!important}
       textarea.inp{resize:vertical;min-height:60px;line-height:1.5}
       input[type=date].inp{cursor:pointer}

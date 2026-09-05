@@ -69,7 +69,8 @@ export function useAppLifecycleEffects({
 
     if (files.length > 0) {
       uploadImported(currentProjectId, files).then((failed) => {
-        if (failed.length > 0) onImportWarning?.(`Tyto přílohy se nepodařilo nahrát: ${failed.join(', ')}`);
+        if (failed.length > 0)
+          onImportWarning?.(`Tyto přílohy se nepodařilo nahrát: ${failed.join(', ')}`);
       });
     }
   }, [currentProjectId, state, dispatch, onImportWarning]);

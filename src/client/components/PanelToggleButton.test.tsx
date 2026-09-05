@@ -5,6 +5,7 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { AppStyles } from './AppStyles';
 import { TopBar } from './TopBar';
 import { QuickNotesHost } from './quicknotes/QuickNotesHost';
 import { VaultHost } from './vault/VaultHost';
@@ -23,35 +24,45 @@ const user = {
   isAdmin: false,
 };
 
-/** Lišta se skutečným zapojením obou panelů, jako v `AuthenticatedApp`. */
+/**
+ * Lišta se skutečným zapojením obou panelů, jako v `AuthenticatedApp`.
+ *
+ * `AppStyles` je součástí kulis schválně: aktivní stav tlačítka je od
+ * zavedení variant `.btn-*` věcí třídy, ne inline stylu, takže bez toho bloku
+ * by nebylo co změřit.
+ */
 function Bar() {
   const notes = useQuickNotes();
   const panel = useOpenPanel();
   return (
-    // biome-ignore lint/a11y/useValidAriaRole: `role` je prop TopBaru (MemberRole), ne ARIA role
-    <TopBar
-      user={user}
-      role={null}
-      onLogout={vi.fn()}
-      onOpenAdmin={vi.fn()}
-      quickNotes={
-        <QuickNotesHost
-          notes={notes}
-          activeProjectId="p1"
-          onConvert={vi.fn()}
-          open={panel.open === 'notes'}
-          onToggle={() => panel.toggle('notes')}
-          onClose={panel.close}
-        />
-      }
-      vault={
-        <VaultHost
-          open={panel.open === 'vault'}
-          onToggle={() => panel.toggle('vault')}
-          onClose={panel.close}
-        />
-      }
-    />
+    <>
+      <AppStyles />
+      {/* biome-ignore lint/a11y/useValidAriaRole: `role` je prop TopBaru (MemberRole), ne ARIA role */}
+      <TopBar
+        user={user}
+        role={null}
+        onLogout={vi.fn()}
+        onOpenAdmin={vi.fn()}
+        worklog={null}
+        quickNotes={
+          <QuickNotesHost
+            notes={notes}
+            activeProjectId="p1"
+            onConvert={vi.fn()}
+            open={panel.open === 'notes'}
+            onToggle={() => panel.toggle('notes')}
+            onClose={panel.close}
+          />
+        }
+        vault={
+          <VaultHost
+            open={panel.open === 'vault'}
+            onToggle={() => panel.toggle('vault')}
+            onClose={panel.close}
+          />
+        }
+      />
+    </>
   );
 }
 
@@ -128,12 +139,15 @@ describe('Přepínání panelů v liště', () => {
   });
 
   it('aktivní tlačítko je odlišené i barvou, nejen atributem', async () => {
+    // Barvy se berou z třídy `.btn-active` v `AppStyles`, ne z inline stylu —
+    // proto se tu měří vypočtená hodnota, ne `element.style`. Kontrola samotné
+    // třídy by prošla i tehdy, kdyby ta třída žádnou barvu nenastavovala.
     render(<Bar />);
-    const closed = notesButton().style.borderColor;
+    const closed = getComputedStyle(notesButton()).borderColor;
 
     await userEvent.click(notesButton());
 
-    expect(notesButton().style.borderColor).not.toBe(closed);
+    expect(getComputedStyle(notesButton()).borderColor).not.toBe(closed);
   });
 
   it('zavření panelu zhasne i tlačítko', async () => {

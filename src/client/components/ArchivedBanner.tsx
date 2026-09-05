@@ -22,8 +22,8 @@ export function ArchivedBanner({ archived }: ArchivedBannerProps) {
         padding: '8px 28px',
       }}
     >
-      🗄 Projekt je archivovaný — jen ke čtení. Úpravy budou možné po vrácení z archivu
-      (Projekty → Archiv → ⤺).
+      🗄 Projekt je archivovaný — jen ke čtení. Úpravy budou možné po vrácení z archivu (Projekty →
+      Archiv → ⤺).
     </div>
   );
 }

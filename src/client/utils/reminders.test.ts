@@ -5,12 +5,7 @@
 // kdy je připomínka splatná.
 import { describe, expect, it } from 'vitest';
 import { toISO } from './dates';
-import {
-  isReminderDue,
-  nextOccurrence,
-  occurrenceAt,
-  occurrencesInMonth,
-} from './reminders';
+import { isReminderDue, nextOccurrence, occurrenceAt, occurrencesInMonth } from './reminders';
 import type { RecurrenceType, RecurringReminder } from '../types';
 
 function reminder(over: Partial<RecurringReminder> & { startDate: string }): RecurringReminder {

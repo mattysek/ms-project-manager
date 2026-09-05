@@ -19,13 +19,7 @@ interface NotesSectionProps {
   role: MemberRole | null;
 }
 
-function NotesHeader({
-  showPreview,
-  onToggle,
-}: {
-  showPreview: boolean;
-  onToggle: () => void;
-}) {
+function NotesHeader({ showPreview, onToggle }: { showPreview: boolean; onToggle: () => void }) {
   return (
     <div
       style={{

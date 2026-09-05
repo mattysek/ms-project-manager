@@ -51,11 +51,7 @@ type ProjectWithState =
     }
 
 /// Projekty uživatele včetně `state_json`; archivované volitelně.
-let listWithStateForUser
-    (db: AppDbContext)
-    (userId: string)
-    (includeArchived: bool)
-    : Async<ProjectWithState list> =
+let listWithStateForUser (db: AppDbContext) (userId: string) (includeArchived: bool) : Async<ProjectWithState list> =
     async {
         let! memberships =
             db.ProjectMembers.AsNoTracking().Where(fun row -> row.UserId = userId).ToListAsync()

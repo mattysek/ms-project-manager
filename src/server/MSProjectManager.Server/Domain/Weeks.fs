@@ -41,6 +41,25 @@ let count (startDate: string) (endDate: string) =
 /// úkoly neořízly na neplatný týden 0.
 let maxWeek (weekCount: int) = max 0 weekCount
 
+/// Natáhne nebo zkrátí alokaci na počet týdnů projektu; chybějící týdny jsou
+/// 100 %, stejnou výchozí hodnotu používá i frontend.
+///
+/// `weekCount = 0` znamená „datumy nejdou přečíst", ne „projekt má nula
+/// týdnů" — stejně jako u `maxWeek`. Alokaci pak necháváme být: dorovnání na
+/// nulu by ji smazalo, a protože další nastavení datumů ji vrátí jako samé
+/// stovky, zmizelo by rozdělení kapacit bez jediné hlášky.
+let fitAlloc (weekCount: int) (alloc: float list) =
+    if weekCount <= 0 then
+        alloc
+    else
+        List.init
+            weekCount
+            (fun index ->
+                match List.tryItem index alloc with
+                | Some value -> value
+                | None -> 100.0
+            )
+
 /// Pondělí `week`-tého týdne projektu (1-based, ADR-014) jako ISO datum.
 ///
 /// Zrcadlí `computeWeeks` na klientovi: týdny začínají pondělkem toho týdne,

@@ -171,8 +171,7 @@ let private vaultProfiles (builder: ModelBuilder) =
     entity.HasKey(fun row -> row.UserId :> obj) |> ignore
     entity.Property(fun row -> row.UserId).HasColumnName "user_id" |> ignore
 
-    entity.Property(fun row -> row.Kdf).HasColumnName("kdf").IsRequired()
-    |> ignore
+    entity.Property(fun row -> row.Kdf).HasColumnName("kdf").IsRequired() |> ignore
 
     entity.Property(fun row -> row.Iterations).HasColumnName "iterations" |> ignore
 
@@ -204,8 +203,7 @@ let private vaultEntries (builder: ModelBuilder) =
     entity.Property(fun row -> row.Ciphertext).HasColumnName("ciphertext").IsRequired()
     |> ignore
 
-    entity.Property(fun row -> row.Iv).HasColumnName("iv").IsRequired()
-    |> ignore
+    entity.Property(fun row -> row.Iv).HasColumnName("iv").IsRequired() |> ignore
 
     entity.Property(fun row -> row.CreatedAt).HasColumnName("created_at").IsRequired()
     |> ignore
@@ -216,6 +214,47 @@ let private vaultEntries (builder: ModelBuilder) =
     entity.HasIndex("UserId") |> ignore
 
     entity.HasOne<AppUser>().WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade)
+    |> ignore
+
+let private workLogEntries (builder: ModelBuilder) =
+    let entity = builder.Entity<WorkLogEntryRow>()
+    entity.ToTable "work_log_entries" |> ignore
+    entity.HasKey(fun row -> row.Id :> obj) |> ignore
+    entity.Property(fun row -> row.Id).HasColumnName "id" |> ignore
+    entity.Property(fun row -> row.UserId).HasColumnName "user_id" |> ignore
+
+    entity.Property(fun row -> row.Title).HasColumnName("title").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.Description).HasColumnName("description").HasDefaultValue ""
+    |> ignore
+
+    entity.Property(fun row -> row.ProjectId).HasColumnName("project_id").IsRequired(false)
+    |> ignore
+
+    entity.Property(fun row -> row.StartedAt).HasColumnName("started_at").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.EndedAt).HasColumnName("ended_at").IsRequired(false)
+    |> ignore
+
+    entity.Property(fun row -> row.Tags).HasColumnName("tags").HasDefaultValue "[]"
+    |> ignore
+
+    entity.Property(fun row -> row.CreatedAt).HasColumnName("created_at").IsRequired()
+    |> ignore
+
+    entity.Property(fun row -> row.UpdatedAt).HasColumnName("updated_at").IsRequired()
+    |> ignore
+
+    // Seznam se čte vždy jako „moje záznamy v rozsahu od–do", seřazené v čase.
+    entity.HasIndex([| "UserId"; "StartedAt" |]) |> ignore
+
+    entity.HasOne<AppUser>().WithMany().HasForeignKey("UserId").OnDelete(DeleteBehavior.Cascade)
+    |> ignore
+
+    // Smazaný projekt výkaz neruší, jen z něj sundá štítek (FR-WL-12).
+    entity.HasOne<ProjectRow>().WithMany().HasForeignKey("ProjectId").OnDelete(DeleteBehavior.SetNull)
     |> ignore
 
 /// Kontext aplikace. Identity tabulky si přidá `IdentityDbContext` sám.
@@ -230,6 +269,7 @@ type AppDbContext(options: DbContextOptions<AppDbContext>) =
     member this.KbRevisions = this.Set<KbRevisionRow>()
     member this.VaultProfiles = this.Set<VaultProfileRow>()
     member this.VaultEntries = this.Set<VaultEntryRow>()
+    member this.WorkLogEntries = this.Set<WorkLogEntryRow>()
 
     override _.OnModelCreating(builder: ModelBuilder) =
         base.OnModelCreating builder
@@ -241,3 +281,4 @@ type AppDbContext(options: DbContextOptions<AppDbContext>) =
         kbRevisions builder
         vaultProfiles builder
         vaultEntries builder
+        workLogEntries builder

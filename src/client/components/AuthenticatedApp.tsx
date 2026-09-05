@@ -12,6 +12,8 @@ import { AdminUsersPage } from './admin/AdminUsersPage';
 import { MyWorkPage } from './workload/MyWorkPage';
 import { QuickNotesHost } from './quicknotes/QuickNotesHost';
 import { VaultHost } from './vault/VaultHost';
+import { WorkLogHost } from './worklog/WorkLogHost';
+import { WorkLogPage } from './worklog/WorkLogPage';
 import { useNoteConversion } from './quicknotes/useNoteConversion';
 import { useProjectSession } from '../hooks/useProjectSession';
 import { useAppCommands } from '../hooks/appCommands';
@@ -74,7 +76,13 @@ function MainContent({
   userId: string;
 }): ReactNode {
   if (currentProjectId === null) {
-    return <LandingPage onOpenProject={nav.loadProject} onOpenMyWork={nav.openMyWork} />;
+    return (
+      <LandingPage
+        onOpenProject={nav.loadProject}
+        onOpenMyWork={nav.openMyWork}
+        onOpenWorkLog={nav.openWorkLog}
+      />
+    );
   }
   if (!state) return <div style={LOADING_STYLE}>Načítám projekt...</div>;
   return (
@@ -154,6 +162,69 @@ function useWorkspaceData({
   };
 }
 
+/**
+ * Lišta se všemi třemi plovoucími panely.
+ *
+ * Vytažená z `AuthenticatedApp` kvůli rozpočtu délky funkce (ADR-012) —
+ * s přibývajícími panely rostla jen ona.
+ */
+function AppTopBar({
+  auth,
+  route,
+  role,
+  onLogout,
+  panel,
+  notes,
+  activeProjectId,
+  onConvert,
+}: {
+  auth: AuthenticatedAuth;
+  route: ReturnType<typeof useRoute>;
+  role: React.ComponentProps<typeof TopBar>['role'];
+  onLogout: () => void;
+  panel: ReturnType<typeof useOpenPanel>;
+  notes: ReturnType<typeof useQuickNotes>;
+  activeProjectId: string | null;
+  onConvert: React.ComponentProps<typeof QuickNotesHost>['onConvert'];
+}) {
+  return (
+    <TopBar
+      user={auth.user}
+      role={role}
+      onLogout={onLogout}
+      onOpenAdmin={() => route.navigate('/admin/users')}
+      quickNotes={
+        <QuickNotesHost
+          notes={notes}
+          activeProjectId={activeProjectId}
+          onConvert={onConvert}
+          open={panel.open === 'notes'}
+          onToggle={() => panel.toggle('notes')}
+          onClose={panel.close}
+        />
+      }
+      vault={
+        <VaultHost
+          open={panel.open === 'vault'}
+          onToggle={() => panel.toggle('vault')}
+          onClose={panel.close}
+        />
+      }
+      worklog={
+        <WorkLogHost
+          open={panel.open === 'worklog'}
+          onToggle={() => panel.toggle('worklog')}
+          onClose={panel.close}
+          onOpenFull={() => {
+            panel.close();
+            route.navigate('/vykazy');
+          }}
+        />
+      }
+    />
+  );
+}
+
 export function AuthenticatedApp({ auth }: AuthenticatedAppProps) {
   const route = useRoute();
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(() =>
@@ -175,6 +246,12 @@ export function AuthenticatedApp({ auth }: AuthenticatedAppProps) {
     return <MyWorkPage onBack={() => route.navigate('/')} onOpenTask={nav.loadProjectTask} />;
   }
 
+  // Výkazy práce stojí mimo projekt (PRD-10) ze stejného důvodu jako „Moje
+  // práce": vykazovaná činnost nemusí patřit žádnému projektu.
+  if (route.path.startsWith('/vykazy')) {
+    return <WorkLogPage onBack={() => route.navigate('/')} />;
+  }
+
   if (route.path.startsWith('/admin/users')) {
     if (!auth.user.isAdmin) {
       route.navigate('/', { replace: true });
@@ -188,28 +265,15 @@ export function AuthenticatedApp({ auth }: AuthenticatedAppProps) {
       style={{ ...LOADING_STYLE, display: 'block', userSelect: 'none', paddingTop: TOP_BAR_HEIGHT }}
     >
       <AppStyles />
-      <TopBar
-        user={auth.user}
+      <AppTopBar
+        auth={auth}
+        route={route}
         role={session.myRole}
         onLogout={nav.handleLogout}
-        onOpenAdmin={() => route.navigate('/admin/users')}
-        quickNotes={
-          <QuickNotesHost
-            notes={notes}
-            activeProjectId={currentProjectId}
-            onConvert={conversion.requestConvert}
-            open={panel.open === 'notes'}
-            onToggle={() => panel.toggle('notes')}
-            onClose={panel.close}
-          />
-        }
-        vault={
-          <VaultHost
-            open={panel.open === 'vault'}
-            onToggle={() => panel.toggle('vault')}
-            onClose={panel.close}
-          />
-        }
+        panel={panel}
+        notes={notes}
+        activeProjectId={currentProjectId}
+        onConvert={conversion.requestConvert}
       />
       <MainContent
         currentProjectId={currentProjectId}

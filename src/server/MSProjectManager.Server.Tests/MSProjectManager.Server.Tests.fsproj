@@ -19,6 +19,7 @@
     <Compile Include="SecurityHeadersTests.fs" />
     <Compile Include="QuickNotesApiTests.fs" />
     <Compile Include="VaultApiTests.fs" />
+    <Compile Include="WorkLogApiTests.fs" />
     <Compile Include="HubTests.fs" />
   </ItemGroup>
 

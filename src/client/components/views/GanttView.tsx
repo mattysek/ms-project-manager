@@ -49,7 +49,13 @@ function EmptyState() {
 function ExportButton({ exporting, onExport }: { exporting: boolean; onExport: () => void }) {
   return (
     <div
-      style={{ position: 'sticky', top: 0, zIndex: LAYERS.stickyHeader, background: '#0f1117', paddingBottom: 12 }}
+      style={{
+        position: 'sticky',
+        top: 0,
+        zIndex: LAYERS.stickyHeader,
+        background: '#0f1117',
+        paddingBottom: 12,
+      }}
     >
       <button
         type="button"

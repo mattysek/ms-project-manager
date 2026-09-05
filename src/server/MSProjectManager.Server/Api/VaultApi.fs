@@ -167,7 +167,9 @@ let rekey (ctx: HttpContext) : Task<IResult> =
                         UserId = userId ctx
                         Ciphertext = entry.Ciphertext
                         Iv = entry.Iv
-                    }: Vault.VaultEntryInput))
+                    }
+                    : Vault.VaultEntryInput)
+                )
 
             let! result =
                 Vault.rekey

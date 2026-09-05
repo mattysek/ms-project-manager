@@ -469,7 +469,15 @@ let ``vypnutá registrace odmítne i přímé volání`` () =
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode)
 
         // A účet opravdu nevznikl.
-        let! attempt = client.PostAsJsonAsync("/auth/login", { UserName = "petra.kolarova"; Password = "Heslo1234" })
+        let! attempt =
+            client.PostAsJsonAsync(
+                "/auth/login",
+                {
+                    UserName = "petra.kolarova"
+                    Password = "Heslo1234"
+                }
+            )
+
         Assert.Equal(HttpStatusCode.Unauthorized, attempt.StatusCode)
     }
 

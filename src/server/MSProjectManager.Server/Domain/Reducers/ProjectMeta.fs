@@ -33,16 +33,10 @@ let private clampTask (maxWeek: int) (task: Task) =
         { task with S = start; E = finish }, Some(TaskUpdated(task.Id, fields))
 
 /// Natáhne nebo zkrátí alokaci na nový počet týdnů; chybějící týdny jsou
-/// 100 %, stejně jako v `changeDates` na klientovi.
+/// 100 %, stejně jako v `changeDates` na klientovi. Vlastní dorovnání je ve
+/// `Weeks.fitAlloc`, protože stejné pravidlo potřebuje i import (`Session`).
 let private resizeAlloc (weekCount: int) (person: Person) =
-    let alloc =
-        List.init
-            weekCount
-            (fun index ->
-                match List.tryItem index person.WeekAlloc with
-                | Some value -> value
-                | None -> 100.0
-            )
+    let alloc = Weeks.fitAlloc weekCount person.WeekAlloc
 
     if alloc = person.WeekAlloc then
         person, None

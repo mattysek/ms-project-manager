@@ -21,6 +21,8 @@ export interface UseAppNavigationResult {
   clearPendingTask: () => void;
   /** Přehled napříč projekty (PRD-08). */
   openMyWork: () => void;
+  /** Výkazy práce (PRD-10). */
+  openWorkLog: () => void;
   closeProject: () => void;
   handleLogout: () => void;
 }
@@ -66,6 +68,7 @@ export function useAppNavigation(
   }, [closeProject, auth]);
 
   const openMyWork = useCallback(() => route.navigate('/moje-prace'), [route]);
+  const openWorkLog = useCallback(() => route.navigate('/vykazy'), [route]);
 
   return {
     loadProject,
@@ -75,5 +78,6 @@ export function useAppNavigation(
     closeProject,
     handleLogout,
     openMyWork,
+    openWorkLog,
   };
 }
