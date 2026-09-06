@@ -26,12 +26,32 @@ async function errorMessage(response: Response): Promise<string> {
   }
 }
 
+/**
+ * Hláška pro případ, kdy požadavek vůbec neodejde — vypnutý server, spadlá
+ * síť, DNS. `fetch` v takové chvíli vyhodí `TypeError` s anglickým textem
+ * („Failed to fetch"), a ten se bez tohohle překladu dostal až do UI: uživatel
+ * viděl u seznamu členů projektu prostě „Failed to fetch".
+ */
+export const NETWORK_ERROR_MESSAGE = 'Server neodpovídá — zkontroluj připojení';
+
+/** Chyba ze sítě, ne odpověď serveru; `statusCode` je 0, žádná odpověď nedorazila. */
+export function isNetworkError(err: unknown): boolean {
+  return err instanceof ApiError && err.statusCode === 0;
+}
+
 export async function apiRequest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...init.headers },
-    ...init,
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...init.headers },
+      ...init,
+    });
+  } catch {
+    // `fetch` odmítá výjimkou jen při síťové chybě; HTTP stavy chodí jako
+    // `ok: false` a řeší je větev níž.
+    throw new ApiError(NETWORK_ERROR_MESSAGE, 0);
+  }
   if (!response.ok) {
     throw new ApiError(await errorMessage(response), response.status);
   }

@@ -7,11 +7,20 @@
 // znamená prosté přepsání čerstvým stavem — proto tu není samostatná
 // invalidační funkce, jen `saveProjectCache`, volaná znovu při každém
 // úspěšném `full_state`.
+import type { ProjectSummary } from '../api/projectsApi';
 import type { AppState } from '../state/appState';
 
 const DB_NAME = 'MSProjectManager_Cache';
-const DB_VERSION = 1;
+// v2 přidalo `project_list`. Obě úložiště otevírá **jen tenhle modul**, takže
+// tu nehrozí past, na kterou doplácí dvojice `offlineQueue`/`noteQueue`: ty
+// sdílejí jednu databázi a musí držet stejné `DB_VERSION`, jinak si vzájemně
+// přebijí `onupgradeneeded`.
+const DB_VERSION = 2;
 const STORE_NAME = 'project_cache';
+const LIST_STORE = 'project_list';
+
+/** Jediný klíč v `project_list` — seznam je vždy celý, ne po projektech. */
+const LIST_KEY = 'mine';
 
 export interface CachedProjectState {
   projectId: string;
@@ -49,8 +58,13 @@ async function openDB(): Promise<IDBDatabase> {
     };
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+      // Obě úložiště se zakládají podmíněně, aby upgrade z v1 nezahodil
+      // existující cache stavů.
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'projectId' });
+      }
+      if (!db.objectStoreNames.contains(LIST_STORE)) {
+        db.createObjectStore(LIST_STORE);
       }
     };
   });
@@ -100,4 +114,80 @@ export async function clearProjectCache(projectId: string): Promise<void> {
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error);
   });
+}
+
+// ── Seznam projektů pro LandingPage ─────────────────────────────────────────
+//
+// Seznam chodí z REST (`/api/projects`), takže bez serveru není odkud ho vzít
+// a úvodní obrazovka zůstávala prázdná — s hláškou „Žádné uložené projekty",
+// která navíc lhala. Cache drží poslední úspěšně načtený seznam, aby se dalo
+// při výpadku aspoň dostat do projektu, který už uživatel otevřený měl.
+//
+// Ukládá se `ProjectSummary[]` tak, jak přišel ze serveru: je to čistě
+// zobrazovací kopie a nic se z ní nikam nezapisuje.
+
+/** Přepíše cache seznamu — voláno po každém úspěšném načtení ze serveru. */
+export async function saveProjectListCache(projects: ProjectSummary[]): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(LIST_STORE, 'readwrite');
+    tx.objectStore(LIST_STORE).put(projects, LIST_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+/** Poslední známý seznam; `null`, když se ještě nikdy nenačetl. */
+export async function getProjectListCache(): Promise<ProjectSummary[] | null> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(LIST_STORE, 'readonly');
+    const request = tx.objectStore(LIST_STORE).get(LIST_KEY);
+
+    request.onsuccess = () => resolve((request.result as ProjectSummary[] | undefined) ?? null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Projekty, ke kterým je uložený stav — tedy ty, které jdou otevřít i bez
+ * serveru.
+ *
+ * Vrací rovnou souhrn ve tvaru `ProjectSummary`, protože úvodní obrazovka
+ * s ním potřebuje pracovat stejně jako se seznamem ze serveru. Data se berou
+ * z uloženého `AppState`, takže sedí na to, co uživatel naposledy viděl.
+ *
+ * Je to druhý, nezávislý zdroj vedle `getProjectListCache`: ten drží seznam
+ * tak, jak přišel ze serveru, ale nemusí obsahovat projekt založený až po
+ * posledním úspěšném načtení. Sjednocení obojího je to, co dělá úvodní
+ * obrazovku offline použitelnou.
+ */
+export async function listCachedProjects(): Promise<ProjectSummary[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const request = tx.objectStore(STORE_NAME).getAll();
+
+    request.onsuccess = () => {
+      const rows = request.result as CachedProjectState[];
+      resolve(rows.map(toSummary));
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/** Souhrn z uloženého stavu; chybějící údaje se dopočítat nedají, tak jsou nulové. */
+function toSummary(row: CachedProjectState): ProjectSummary {
+  const state = row.state;
+  return {
+    id: row.projectId,
+    name: state.project?.name || 'Bez názvu',
+    startDate: state.project?.startDate ?? '',
+    endDate: state.project?.endDate ?? '',
+    budget: state.project?.budget ?? 0,
+    peopleCount: state.people?.length ?? 0,
+    taskCount: state.tasks?.length ?? 0,
+    createdAt: row.cachedAt,
+    updatedAt: row.cachedAt,
+  };
 }

@@ -76,9 +76,12 @@ function useLanding(onOpenProject: (projectId: string) => void) {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   // Chyby importu — chyby operací nad projekty hlásí `useProjectsList`.
   const [notice, setNotice] = useState<string | null>(null);
-  // Před připojením k projektu ještě neexistuje SignalR kanál (ADR-004) — na
-  // LandingPage má smysl jen hrubý signál z prohlížeče, ne stav spojení.
-  const { isOffline } = useOfflineStatus('connected');
+  // Před připojením k projektu ještě neexistuje SignalR kanál (ADR-004), takže
+  // ze stavu spojení tu není co číst. `navigator.onLine` ale sám nestačí:
+  // vypnutý server nechá prohlížeč „online" a úvodní obrazovka by o výpadku
+  // nevěděla. Druhým signálem je proto neúspěšné načtení seznamu (`stale`).
+  const { isOffline: browserOffline } = useOfflineStatus('connected');
+  const isOffline = browserOffline || list.stale;
 
   const createProject = async (name: string) => {
     const id = await list.createAndOpen(name);
@@ -97,9 +100,23 @@ function useLanding(onOpenProject: (projectId: string) => void) {
     importAsNewProject(list.createAndOpen, onOpenProject, setNotice);
   };
 
+  /**
+   * Offline se dá otevřít jen projekt s uloženým stavem — u ostatních by
+   * `useProjectSession` neměl co seednout a obrazovka by zůstala na
+   * „Načítám projekt…" napořád.
+   */
+  const openProject = (id: string) => {
+    if (isOffline && !list.offlineReady.has(id)) {
+      setNotice('Tenhle projekt nemáš uložený offline — otevři ho, až bude server dostupný.');
+      return;
+    }
+    onOpenProject(id);
+  };
+
   return {
     list,
     isOffline,
+    openProject,
     notice,
     dismissNotice: () => setNotice(null),
     showNewForm,
@@ -132,7 +149,7 @@ export function LandingPage({ onOpenProject, onOpenMyWork, onOpenWorkLog }: Land
       <div style={{ maxWidth: 900, margin: '0 auto' }}>
         <Hero />
 
-        {isOffline && <OfflineBanner />}
+        {isOffline && <OfflineBanner stale={ui.list.stale} />}
 
         {/* Blokující `alert()` nahrazený pruhem: modální dialog prohlížeče se
             nedá zavřít jinak než myší, nejde otestovat a v aplikaci, která
@@ -170,13 +187,14 @@ export function LandingPage({ onOpenProject, onOpenMyWork, onOpenWorkLog }: Land
         <ProjectList
           projects={projects}
           loading={loading}
-          onOpen={onOpenProject}
+          onOpen={ui.openProject}
+          unavailable={isOffline ? (id: string) => !ui.list.offlineReady.has(id) : undefined}
           actionsFor={(project) => activeProjectActions(project, archive)}
         />
 
         <ArchiveSection
           archived={archived}
-          onOpen={onOpenProject}
+          onOpen={ui.openProject}
           onUnarchive={unarchive}
           onRequestDelete={ui.setDeleteConfirm}
         />
@@ -223,7 +241,12 @@ function Hero() {
   );
 }
 
-function OfflineBanner() {
+/**
+ * Dvě různé situace, dvě různé věty. „Server neodpovídá" je ta, kterou dřív
+ * uživatel nedostal vůbec — prohlížeč byl online, takže banner nevyskočil a
+ * prázdný seznam vypadal jako smazané projekty.
+ */
+function OfflineBanner({ stale }: { stale: boolean }) {
   return (
     <div
       style={{
@@ -237,7 +260,9 @@ function OfflineBanner() {
         textAlign: 'center',
       }}
     >
-      ⚠ Offline — seznam projektů může být neaktuální. Import projektu vyžaduje připojení.
+      {stale
+        ? '⚠ Server neodpovídá — zobrazuji poslední známý seznam projektů. Otevřít jdou jen projekty uložené offline.'
+        : '⚠ Offline — seznam projektů může být neaktuální. Import projektu vyžaduje připojení.'}
     </div>
   );
 }

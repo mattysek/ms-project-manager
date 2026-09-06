@@ -7,6 +7,8 @@ import type { ProjectSummary } from '../api/projectsApi';
 import * as projectsApi from '../api/projectsApi';
 import { LandingPage } from './LandingPage';
 import { takePendingImport } from '../state/pendingImport';
+import { saveProjectCache, saveProjectListCache } from '../storage/projectCache';
+import { makeAppState } from '../state/testFixtures';
 
 function summary(overrides: Partial<ProjectSummary> = {}): ProjectSummary {
   return {
@@ -128,6 +130,80 @@ describe('LandingPage — vytvoření a otevření projektu', () => {
     await userEvent.click(await screen.findByText('Backend refaktoring'));
 
     expect(onOpenProject).toHaveBeenCalledWith('existing');
+  });
+});
+
+describe('LandingPage — server neodpovídá', () => {
+  /** Selhání načtení seznamu tak, jak ho vrací `projectsApi` při výpadku. */
+  function serverDown(): void {
+    vi.spyOn(projectsApi, 'listProjects').mockRejectedValue(
+      new projectsApi.ProjectsApiError(projectsApi.NETWORK_ERROR_MESSAGE, 0)
+    );
+    // Chyba se loguje do konzole — v testu je to jen šum.
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+  }
+
+  function renderLanding(onOpenProject = vi.fn()) {
+    render(
+      <LandingPage onOpenProject={onOpenProject} onOpenMyWork={vi.fn()} onOpenWorkLog={vi.fn()} />
+    );
+    return onOpenProject;
+  }
+
+  // @scenario: offline.feature > Vypnutý server pozná i úvodní obrazovka
+  it('banner se objeví, i když prohlížeč hlásí online', async () => {
+    // Tohle je jádro chyby: server je vypnutý, ale síť běží, takže
+    // `navigator.onLine` je `true` a hrubá detekce mlčí.
+    setBrowserOnline(true);
+    await saveProjectListCache([summary({ id: 'p1', name: 'Backend refaktoring' })]);
+    serverDown();
+    renderLanding();
+
+    expect(await screen.findByText(/Server neodpovídá/)).toBeInTheDocument();
+  });
+
+  // @scenario: offline.feature > Seznam projektů přežije výpadek serveru
+  it('seznam se vezme z cache a projekt se uloženým stavem jde otevřít', async () => {
+    await saveProjectListCache([summary({ id: 'p1', name: 'Backend refaktoring' })]);
+    await saveProjectCache('p1', makeAppState());
+    serverDown();
+    const onOpenProject = renderLanding();
+
+    await userEvent.click(await screen.findByText('Backend refaktoring'));
+
+    expect(onOpenProject).toHaveBeenCalledWith('p1');
+  });
+
+  it('projekt založený po posledním načtení seznamu se doplní z cache stavu', async () => {
+    // Seznam ze serveru je starší než cache stavu — bez sjednocení obou zdrojů
+    // by projekt, který uživatel právě založil a otevřel, offline zmizel.
+    await saveProjectListCache([]);
+    await saveProjectCache(
+      'cerstvy',
+      makeAppState({ project: { ...makeAppState().project, name: 'Čerstvý projekt' } })
+    );
+    serverDown();
+    const onOpenProject = renderLanding();
+
+    // Jméno se bere z uloženého `AppState`, ne ze seznamu — ten o projektu
+    // ještě neví.
+    await userEvent.click(await screen.findByText('Čerstvý projekt'));
+
+    expect(onOpenProject).toHaveBeenCalledWith('cerstvy');
+  });
+
+  // @scenario: offline.feature > Projekt bez uloženého stavu je offline označený
+  it('projekt bez uloženého stavu je označený a nejde otevřít', async () => {
+    await saveProjectListCache([summary({ id: 'neotevreny', name: 'Mobilní klient' })]);
+    serverDown();
+    const onOpenProject = renderLanding();
+
+    expect(await screen.findByText('není uložený offline', { exact: false })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByText('Mobilní klient'));
+
+    expect(onOpenProject).not.toHaveBeenCalled();
+    expect(screen.getByText(/nemáš uložený offline/)).toBeInTheDocument();
   });
 });
 

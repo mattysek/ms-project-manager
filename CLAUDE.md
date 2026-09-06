@@ -159,8 +159,12 @@ Writable paths (`Hosting/Options.fs`) resolve relative config values against **`
 Client IndexedDB is **only** an offline cache (ADR-009), not the source of truth:
 - `storage/offlineQueue.ts` — `pending_commands`, max 500, 48h expiry
 - `storage/noteQueue.ts` — `pending_notes`. Quick Notes go over REST, not SignalR, so they can't ride the command queue; this is their equivalent. **Both modules open the same database and must declare the same `DB_VERSION` and create both stores** in `onupgradeneeded` — whichever opens first runs the upgrade.
-- `storage/projectCache.ts` — last known state, seeds the UI before `full_state` arrives
-- `storage/projectStorage.ts` — project list for the landing page
+- `storage/projectCache.ts` — last known state per project (seeds the UI before `full_state` arrives) **and** the landing page's project list. Both stores live in one database, which only this module opens, so bumping `DB_VERSION` here is safe — unlike the `offlineQueue`/`noteQueue` pair above
+- `storage/projectStorage.ts` — dead since ADR-005 moved project CRUD to the server; nothing reads or writes it
+
+**The landing page has to survive a dead server, and `navigator.onLine` won't tell it.** With the server down but the network up the browser stays "online", so the only signal is the list request failing. Before that was wired up, returning from a project re-mounted `LandingPage`, the fetch failed silently, and the user got "Žádné uložené projekty" — no error, no way back into the project they had just left. The list now falls back to the union of the cached list and the projects that have a cached *state*; the second source matters because a project created after the last successful fetch is only in the state cache. Only projects in that state cache can actually be opened offline, so the rest are marked and refused up front instead of hanging on "Načítám projekt…" forever.
+
+**A failed `fetch` throws `TypeError: Failed to fetch`, and that English string used to reach the screen** (the members panel rendered it verbatim). `httpClient` and `projectsApi` translate it into `NETWORK_ERROR_MESSAGE` with `statusCode: 0`, so `isNetworkError` can tell "server unreachable" from "server said no".
 
 `detectConflicts.ts` compares the queue against the server state on reconnect. Three things about that comparison are load-bearing and were each a real bug:
 

@@ -9,6 +9,8 @@ interface ProjectListProps {
   /** Akce pro konkrétní projekt — liší se mezi aktivními a archivem. */
   actionsFor: (project: ProjectSummary) => { label: string; title: string; onClick: () => void }[];
   emptyState?: ReactNode;
+  /** Offline: které projekty nejdou otevřít, protože nemají uložený stav. */
+  unavailable?: (id: string) => boolean;
 }
 
 function EmptyState() {
@@ -38,6 +40,7 @@ export function ProjectList({
   onOpen,
   actionsFor,
   emptyState,
+  unavailable,
 }: ProjectListProps) {
   if (loading) {
     return <div style={{ color: '#475569', padding: 20, textAlign: 'center' }}>Načítám...</div>;
@@ -53,6 +56,7 @@ export function ProjectList({
           project={project}
           onOpen={() => onOpen(project.id)}
           actions={actionsFor(project)}
+          unavailable={unavailable?.(project.id)}
         />
       ))}
     </div>

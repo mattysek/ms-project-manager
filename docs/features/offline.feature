@@ -128,3 +128,44 @@ Feature: Offline podpora
     And obě operace (move a reverse-move) jsou v pending queue
     When se reconnectuje, obě operace jsou přehrány sekvenčně
     Then výsledný stav na serveru je W1-W4
+
+  # ── Úvodní obrazovka ──────────────────────────────────────────────────────
+
+  Scenario: Vypnutý server pozná i úvodní obrazovka
+    # `navigator.onLine` tu nestačí: vypnutý server nechá prohlížeč „online",
+    # takže banner nevyskočil a prázdný seznam vypadal jako smazané projekty.
+    # Druhým signálem je proto neúspěšné načtení seznamu.
+    Given "jan.novak" je na LandingPage a server přestane odpovídat
+    When se seznam projektů obnoví
+    Then je zobrazeno, že server neodpovídá a seznam je poslední známý
+
+  Scenario: Seznam projektů přežije výpadek serveru
+    # Uvnitř sezení to nebylo vidět — neúspěšné načtení nechalo starý stav —
+    # ale návratem z projektu se LandingPage odmontuje a namontuje znovu, takže
+    # uživatel uviděl „Žádné uložené projekty" a neměl se jak vrátit tam,
+    # odkud právě přišel.
+    Given "jan.novak" má otevřený projekt "Backend refaktoring"
+    When server přestane odpovídat a "jan.novak" se vrátí na seznam projektů
+    Then vidí "Backend refaktoring" v seznamu
+    And může ho otevřít z uloženého stavu
+
+  Scenario: Projekt bez uloženého stavu je offline označený
+    # Seznam z cache je obvykle větší než to, co jde otevřít: obsahuje
+    # i projekty, které uživatel nikdy neotevřel. Bez označení by skončily
+    # na věčném „Načítám projekt…".
+    Given "jan.novak" je členem projektu "Mobilní klient", který nikdy neotevřel
+    And server neodpovídá
+    When se podívá na seznam projektů
+    Then je "Mobilní klient" označený jako neuložený offline
+    When na něj klikne
+    Then se dozví, že ho musí otevřít, až bude server dostupný
+    And zůstane na seznamu projektů
+
+  Scenario: Chyba spojení je česky, ne hláškou prohlížeče
+    # `fetch` při nedostupném serveru vyhodí `TypeError: Failed to fetch`
+    # a ten se dostal až na obrazovku — u seznamu členů projektu stálo
+    # doslova „Failed to fetch".
+    Given server neodpovídá
+    When si aplikace vyžádá data přes REST
+    Then chyba nese českou hlášku o nedostupném serveru
+    And jde odlišit od chyby, kterou vrátil server

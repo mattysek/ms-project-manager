@@ -15,12 +15,17 @@ interface ProjectListItemProps {
   onOpen: () => void;
   /** Akce vpravo od projektu. V archivu jiné než u aktivních. */
   actions: { label: string; title: string; onClick: () => void }[];
+  /**
+   * Offline a bez uloženého stavu — projekt je v seznamu z cache, ale otevřít
+   * ho nejde. Zůstává vidět schválně: zmizet by vypadalo jako smazaný.
+   */
+  unavailable?: boolean;
 }
 
 // Otevírací akce je `<button>`, ne `<div role="button">` (Biome
 // `useSemanticElements`) — mazací tlačítko proto musí být SOURozenec, ne
 // potomek (`<button>` uvnitř `<button>` je neplatné HTML).
-export function ProjectListItem({ project, onOpen, actions }: ProjectListItemProps) {
+export function ProjectListItem({ project, onOpen, actions, unavailable }: ProjectListItemProps) {
   return (
     <div
       className="project-card"
@@ -51,8 +56,23 @@ export function ProjectListItem({ project, onOpen, actions }: ProjectListItemPro
         }}
       >
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 14, fontWeight: 600, color: '#4f9cf9', marginBottom: 4 }}>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 600,
+              color: unavailable ? '#475569' : '#4f9cf9',
+              marginBottom: 4,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
             {project.name}
+            {unavailable && (
+              <span style={{ fontSize: 9, color: '#64748b', fontWeight: 400 }}>
+                ⚡ není uložený offline
+              </span>
+            )}
           </div>
           <div style={{ fontSize: 10, color: '#475569', display: 'flex', gap: 16 }}>
             <span>

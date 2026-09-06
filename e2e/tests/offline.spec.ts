@@ -268,4 +268,57 @@ test.describe('Offline režim', () => {
       'Import projektu vyžaduje připojení k serveru'
     );
   });
+  /**
+   * Vypnutý server, ale živá síť — `navigator.onLine` zůstává `true`.
+   *
+   * Odlišuje se od `goOffline` schválně: hrubá detekce z prohlížeče tu mlčí,
+   * takže se testuje právě ta cesta, kterou úvodní obrazovka dřív neměla.
+   */
+  async function serverDown(page: Page): Promise<void> {
+    await page.route('**/api/**', (route) => route.abort());
+    await page.route('**/hubs/**', (route) => route.abort());
+  }
+
+  // @scenario: offline.feature > Seznam projektů přežije výpadek serveru
+  test('po výpadku serveru zůstane projekt v seznamu a jde otevřít', async ({ page, request }) => {
+    const { name } = await projectWithPerson(page, request);
+
+    await serverDown(page);
+    await page.getByRole('button', { name: '← Projekty' }).click();
+
+    // Dřív tady bylo „Žádné uložené projekty" a cesta zpátky do projektu,
+    // ve kterém uživatel právě byl, neexistovala.
+    await expect(page.getByText(/Server neodpovídá/)).toBeVisible();
+    await expect(page.getByText(name)).toBeVisible();
+
+    await page.getByText(name).click();
+
+    // Otevřít nestačí — obsah musí přijít z cache stavu, ne z prázdného
+    // projektu, který by se tvářil stejně.
+    await page.getByRole('tab', { name: 'Kapacita' }).click();
+    await expect(page.getByLabel('Jméno — Petra Kolářová')).toBeVisible();
+  });
+
+  // @scenario: offline.feature > Projekt bez uloženého stavu je offline označený
+  test('projekt, který uživatel nikdy neotevřel, se offline pozná', async ({ page, request }) => {
+    const user = await createUser(request, 'Jan Novák');
+    await loginAs(page, user);
+
+    // Přes REST, ne přes UI: založení z LandingPage projekt rovnou otevře,
+    // takže by se stihl uložit do cache stavu.
+    const name = unique('Nikdy neotevreny');
+    await page.request.post('/api/projects', { data: { name } });
+    await page.reload();
+    await expect(page.getByText(name)).toBeVisible();
+
+    await serverDown(page);
+    await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+
+    await expect(page.getByText('není uložený offline', { exact: false })).toBeVisible();
+
+    await page.getByText(name).click();
+
+    await expect(page.getByText(/nemáš uložený offline/)).toBeVisible();
+    await expect(page.getByRole('button', { name: '+ Nový projekt' })).toBeVisible();
+  });
 });

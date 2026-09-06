@@ -30,6 +30,13 @@ export interface ProjectSummary {
   archivedAt?: string | null;
 }
 
+// Jediné, co se sdílí s `httpClient`: text hlášky. Klienta má tenhle modul
+// vlastního schválně (čte `response.text()`, ne JSON `{ message }`), ale
+// uživateli nemá smysl říkat o výpadku dvěma různými větami.
+import { NETWORK_ERROR_MESSAGE } from './httpClient';
+
+export { NETWORK_ERROR_MESSAGE };
+
 export class ProjectsApiError extends Error {
   constructor(
     message: string,
@@ -41,11 +48,18 @@ export class ProjectsApiError extends Error {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const response = await fetch(path, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...init.headers },
-    ...init,
-  });
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...init.headers },
+      ...init,
+    });
+  } catch {
+    // Stejný důvod jako v `httpClient`: bez tohohle se anglické „Failed to
+    // fetch" dostane až na obrazovku.
+    throw new ProjectsApiError(NETWORK_ERROR_MESSAGE, 0);
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => '');
     throw new ProjectsApiError(
