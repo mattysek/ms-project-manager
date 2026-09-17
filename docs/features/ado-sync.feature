@@ -37,6 +37,15 @@ Feature: Azure DevOps synchronizace
     And UI zobrazí "PAT uložen — poslední aktualizace: 11.8.2026 14:30"
     And PAT hodnota není nikde zobrazena zpětně
 
+  Scenario: Stav PATu přežije reload stránky
+    # PAT ani informace o jeho existenci nejsou součástí stavu projektu (jsou
+    # per-user), takže po reloadu o něm klient neví nic a musí se zeptat.
+    # Dokud se neptal, tvrdil „PAT není nastaven" a nepustil ani synchronizaci.
+    Given "jan.novak" má uložený PAT
+    When znovu načte stránku a otevře záložku "ADO Sync"
+    Then UI zobrazí "PAT uložen — poslední aktualizace: …"
+    And tlačítko "Synchronizovat" je aktivní
+
   Scenario: Ověření připojení k ADO
     Given "jan.novak" má uloženou konfiguraci a PAT
     When klikne na "Ověřit připojení"
@@ -123,6 +132,39 @@ Feature: Azure DevOps synchronizace
     Then změna zmizí ze seznamu
     And při příštím syncu se tato konkrétní změna nezobrazí (je označena jako ignored v snapshotu)
 
+  Scenario: Akce nad změnou ji odbaví ze seznamu
+    # Server za push ani za přebrání hodnoty žádný diff neposílá — bez
+    # lokálního odbavení zůstal řádek viset se stejnými tlačítky a vypadalo to,
+    # že klik nic neudělal.
+    Given je zobrazena změna WI #1234
+    When "jan.novak" na ní provede akci (přijmout z ADO, push do ADO, merge)
+    Then změna zmizí ze seznamu bez čekání na další synchronizaci
+    And ostatní změny v seznamu zůstanou
+
+  Scenario: Odmítnutá akce vrátí změnu zpět
+    Given "jan.novak" provedl akci nad změnou WI #1234
+    When server akci odmítne (chyba z ADO nebo smazaný úkol)
+    Then je změna znovu v seznamu
+    And uživatel ji může zkusit vyřešit jinak
+
+  Scenario: Propsaná hodnota se příštím syncem nevrací
+    # Baseline se po zápisu do ADO srovná, jinak by ji další sync porovnal se
+    # stavem před pushem a nabídl uživateli k potvrzení jeho vlastní změnu —
+    # obráceně, jako by přišla z ADO.
+    Given úkol "API refaktoring" má jiné přiřazení než WI #1234
+    When "jan.novak" klikne "Synchronizovat do ADO →"
+    And spustí synchronizaci znovu
+    Then rozdíl přiřazení už není hlášen
+    And není hlášena ani opačná změna "přiřazení v ADO se změnilo"
+
+  Scenario: Rozdíl popisu se nehlásí kvůli formátování
+    # Plánovač drží markdown, ADO HTML; převod tam a zpátky je ztrátový
+    # (prázdné řádky, číslování). Porovnává se proto text, ne jeho tvar.
+    Given popis úkolu "API refaktoring" byl odeslán do ADO
+    When "jan.novak" spustí synchronizaci
+    Then změna popisu není hlášena
+    But pokud se texty skutečně liší obsahem, změna hlášena je
+
   Scenario: Detekce rozdílu přiřazení (Planner → ADO)
     Given úkol "API refaktoring" je přiřazen "Petra Kolářová" v plánovači
     And WI #1234 je přiřazen "jan.novak@firma.cz" v ADO (nesouhlasí)
@@ -173,6 +215,15 @@ Feature: Azure DevOps synchronizace
     Then server vytvoří nový WI v ADO a obdrží ID (např. #1567)
     And úkol "Databázová migrace" dostane odkaz "WI #1567"
     And do sync logu: "PUSHED_TO_ADO — nový WI #1567 vytvořen"
+
+  Scenario: Úkoly bez ADO linku se nabízejí všechny
+    # Seznam byl natvrdo uříznutý na dvaceti položkách a úkoly bez přiřazené
+    # osoby se přeskakovaly úplně, takže se nově založený úkol do nabídky
+    # nedostal a vypadalo to, že ho ADO Sync nevidí.
+    Given projekt má 25 úkolů bez ADO linku, z toho jeden bez přiřazené osoby
+    When "jan.novak" otevře sekci "Úkoly bez ADO linku"
+    Then je nabídnuto zobrazení všech 25 úkolů
+    And úkol bez přiřazené osoby je mezi nimi
 
   Scenario: Coverage gap — WI v ADO bez linku v plánovači
     Given WI #1400 "Frontend integrace" existuje v ADO pod areaPath "NPEZ\Backend"

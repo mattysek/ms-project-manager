@@ -11,6 +11,7 @@
 //
 // Sekce konfigurace je pro Dev **skrytá**, ne jen disablovaná (FR-ROLE-04
 // výjimka) — údaje o PATu se mu nesmí objevit ani v DOMu.
+import { useEffect } from 'react';
 import type { ADOConfig, ADOSyncLogEntry, Categories, Person, Task } from '../../types';
 import type { MemberRole } from '../../types/protocol';
 import type { UseAdoSyncResult } from '../../hooks/useAdoSync';
@@ -52,6 +53,16 @@ export function AdoSyncView({
   const gapCtx: GapContext | null = adoConfig
     ? { people, cats, tasks, numWeeks, config: adoConfig }
     : null;
+
+  // Stav PATu není v `AppState` (je per-user), takže po reloadu ani po
+  // reconnectu o něm klient neví nic a tvrdil by „PAT není nastaven" —
+  // včetně zakázaného tlačítka synchronizace. Ptáme se tedy sami, při každém
+  // vstupu na záložku a po návratu online; command je PM-only (FR-ROLE-04).
+  const { requestStatus } = ado.commands;
+  useEffect(() => {
+    if (isOffline || role !== 'pm') return;
+    requestStatus();
+  }, [isOffline, role, requestStatus]);
 
   return (
     <div style={{ padding: '20px 28px' }}>

@@ -96,6 +96,7 @@ let private authorizeAdo (command: AdoCommand) =
     | AdoSavePat _
     | AdoDeletePat -> denied "ADO konfigurace je pouze pro PM"
     | AdoTestConnection -> pmOnly "ověřovat připojení k ADO"
+    | AdoRequestStatus -> pmOnly "číst stav ADO připojení"
     | AdoRunSync -> pmOnly "spustit ADO synchronizaci"
     | AdoAcknowledgeChange _
     | AdoIgnoreGap _

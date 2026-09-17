@@ -79,6 +79,10 @@ type AdoCommand =
     | AdoSavePat of pat: string
     | AdoDeletePat
     | AdoTestConnection
+    /// Dotaz na per-user stav PATu (FR-ADO-02). PAT se ke klientovi nikdy
+    /// nevrací, takže po reloadu nemá jak vědět, že nějaký uložený je —
+    /// bez tohohle dotazu tvrdí „PAT není nastaven" a nepustí ani sync.
+    | AdoRequestStatus
     // Synchronizace (FR-ADO-04)
     | AdoRunSync
     // Rozhodnutí uživatele nad výsledkem (FR-ADO-06, FR-ADO-09)

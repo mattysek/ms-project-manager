@@ -31,6 +31,7 @@ let applyAdo (state: AppState) (command: AdoCommand) : Result<AppState * Project
     | AdoSavePat _
     | AdoDeletePat
     | AdoTestConnection
+    | AdoRequestStatus
     | AdoRunSync
     | AdoAcknowledgeChange _
     | AdoIgnoreGap _

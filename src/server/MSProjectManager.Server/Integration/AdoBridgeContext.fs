@@ -12,6 +12,7 @@ open Microsoft.Extensions.DependencyInjection
 open System.Net.Http
 open MSProjectManager.Domain.Types
 open MSProjectManager.Domain.Ado
+open MSProjectManager.Domain.AdoSync
 open MSProjectManager.Domain.Commands
 open MSProjectManager.Domain.Diffs
 open MSProjectManager.Protocol.Json
@@ -84,6 +85,26 @@ let tryLoadSnapshot (deps: BridgeDependencies) (projectId: string) : Async<AdoSn
 
 let saveSnapshot (deps: BridgeDependencies) (projectId: string) (snapshot: AdoSnapshot) =
     withDb deps (fun db -> AdoCredentials.saveSnapshot db projectId (serialize snapshot))
+
+/// Srovná baseline snapshotu s work itemem po zápisu do ADO.
+///
+/// Bez tohohle kroku je snapshot po každém pushi zastaralý: sync ho naposledy
+/// psal s **původní** hodnotou, takže při dalším běhu vidí rozdíl, který jsme
+/// do ADO poslali sami, a nabídne ho k potvrzení jako změnu z ADO. Uživatel
+/// pak propsal přiřazení do ADO a vzápětí musel odklikávat „v ADO je někdo
+/// jiný" — obráceně a zbytečně.
+///
+/// Bez uloženého snapshotu není co srovnávat (sync ještě neproběhl).
+let refreshSnapshotItem (deps: BridgeDependencies) (projectId: string) (view: AdoWorkItemView) : Async<unit> =
+    async {
+        let! snapshot = tryLoadSnapshot deps projectId
+
+        match snapshot with
+        | None -> return ()
+        | Some current ->
+            let items = Map.add (string view.Id) (snapshotItemOfView view) current.Items
+            do! saveSnapshot deps projectId { current with Items = items }
+    }
 
 /// Aktualizuje uživatelská rozhodnutí ve snapshotu (FR-ADO-06, FR-ADO-09).
 /// Bez uloženého snapshotu není co měnit — sync ještě neproběhl.

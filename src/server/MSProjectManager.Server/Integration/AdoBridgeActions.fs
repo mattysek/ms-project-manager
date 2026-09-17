@@ -145,6 +145,24 @@ let private fetchOne deps credentials (wiId: int) =
             | first :: _ -> Ok(toView first)
     }
 
+/// Srovná baseline snapshotu s tím, co jsme právě do ADO zapsali (FR-ADO-05).
+///
+/// Work item se kvůli tomu stahuje **znovu**: víme, co jsme poslali, ne co
+/// z toho ADO udělalo — přiřazení se posílá jako e-mail a ve snapshotu je
+/// zobrazované jméno. Selhání dotazu akci neshodí, jen nechá baseline starou;
+/// push do ADO už proběhl a chyba tady by tvrdila opak.
+let private rebaseline deps credentials (projectId: string) (wiId: int) =
+    async {
+        try
+            let! wi = fetchOne deps credentials wiId
+
+            match wi with
+            | Ok view -> do! refreshSnapshotItem deps projectId view
+            | Error _ -> ()
+        with _ ->
+            ()
+    }
+
 /// Přebrání hodnoty z ADO (FR-ADO-06).
 let acceptFromAdo deps credentials (state: AppState) (command: int * string * AdoAcceptField * string option) =
     async {
@@ -162,7 +180,7 @@ let acceptFromAdo deps credentials (state: AppState) (command: int * string * Ad
     }
 
 /// Přepíše přiřazení work itemu podle plánovače (FR-ADO-07).
-let pushAssignee deps credentials (state: AppState) (wiId: int, taskId: string) =
+let pushAssignee deps credentials (state: AppState) (projectId: string, wiId: int, taskId: string) =
     async {
         match requireTask state taskId with
         | Error message -> return [ Emit(ErrorOccurred(message, "ado_push_assignee")) ]
@@ -175,26 +193,34 @@ let pushAssignee deps credentials (state: AppState) (wiId: int, taskId: string) 
                     ]
             | Some identity ->
                 do! updateWorkItemField deps.Http credentials wiId ("System.AssignedTo", identity)
+                do! rebaseline deps credentials projectId wiId
                 return [ pushed task (wiId, task.Name) $"Přiřazení posláno do ADO: {identity}" ]
     }
 
 /// Přepíše stav work itemu (FR-ADO-07).
-let pushState deps credentials (state: AppState) (wiId: int, taskId: string, target: string) =
+let pushState deps credentials (state: AppState) (projectId: string, wiId: int, taskId: string, target: string) =
     async {
         match requireTask state taskId with
         | Error message -> return [ Emit(ErrorOccurred(message, "ado_push_state")) ]
         | Ok task ->
             do! updateWorkItemField deps.Http credentials wiId ("System.State", target)
+            do! rebaseline deps credentials projectId wiId
             return [ pushed task (wiId, task.Name) $"Stav v ADO změněn na {target}" ]
     }
 
 /// Přepíše popis work itemu; při obousměrném merge uloží text i na úkol.
-let pushDescription deps credentials (state: AppState) (wiId: int, taskId: string, text: string, alsoPlanner: bool) =
+let pushDescription
+    deps
+    credentials
+    (state: AppState)
+    (projectId: string, wiId: int, taskId: string, text: string, alsoPlanner: bool)
+    =
     async {
         match requireTask state taskId with
         | Error message -> return [ Emit(ErrorOccurred(message, "ado_push_description")) ]
         | Ok task ->
             do! updateWorkItemField deps.Http credentials wiId ("System.Description", markdownToHtml text)
+            do! rebaseline deps credentials projectId wiId
 
             let action = if alsoPlanner then DescSyncBoth else DescSyncToAdo
 

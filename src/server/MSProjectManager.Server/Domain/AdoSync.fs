@@ -80,14 +80,12 @@ let allLinkedWiIds (tasks: Task list) : int list =
     |> List.collect (fun mapping -> mapping.WiIds)
     |> List.distinct
 
-/// Úkoly bez ADO vazby. Backlog (úkol bez osoby) se nepočítá — nemá koho
-/// v ADO přiřadit.
+/// Úkoly bez ADO vazby (FR-ADO-08). Úkol bez osoby se počítá taky — work item
+/// bez přiřazení je v ADO legální; zrcadlí `tasksWithoutAdoLink` na klientovi,
+/// který tenhle seznam vykresluje.
 let findTasksWithoutAdoLink (tasks: Task list) : Task list =
     tasks
-    |> List.filter (fun task ->
-        not (String.IsNullOrEmpty task.P)
-        && not (task.Links |> List.exists (fun link -> isAdoUrl link.Url))
-    )
+    |> List.filter (fun task -> not (task.Links |> List.exists (fun link -> isAdoUrl link.Url)))
 
 /// Work items v ADO, na které neodkazuje žádný úkol (Coverage gap, FR-ADO-09).
 let findUncoveredWorkItems (workItems: AdoWorkItem list) (linkedWiIds: int list) =
@@ -123,6 +121,20 @@ let toView (wi: AdoWorkItem) : AdoWorkItemView =
         DescriptionMd = descriptionOf wi
     }
 
+/// Položka baseline z work itemu tak, jak ho vidí klient.
+///
+/// Stejný tvar, jaký skládá `buildSnapshot` — používá se po zápisu do ADO,
+/// aby baseline odpovídala tomu, co jsme tam právě poslali.
+let snapshotItemOfView (view: AdoWorkItemView) : AdoSnapshotItem =
+    {
+        State = view.State
+        RemainingWork = view.RemainingWork
+        AssignedTo = view.AssignedTo
+        DescriptionHash = descriptionHash view.DescriptionMd
+        WorkItemType = view.WorkItemType
+        Title = view.Title
+    }
+
 /// Nový baseline z aktuálních work itemů. Uživatelská rozhodnutí se přebírají
 /// z předchozího snapshotu — jsou to odklikané volby, ne odvozená data.
 ///
@@ -138,19 +150,12 @@ let buildSnapshot
     (requestedIds: int list)
     (workItems: AdoWorkItem list)
     : AdoSnapshot =
+    // Přes `toView` schválně: baseline se po zápisu do ADO přepisuje
+    // `snapshotItemOfView` a obě cesty musí dát tutéž hodnotu, jinak by sync
+    // hlásil rozdíl proti tomu, co sám uložil.
     let fetched =
         workItems
-        |> List.map (fun wi ->
-            string wi.Id,
-            {
-                State = wi.Fields.State
-                RemainingWork = wi.Fields.RemainingWork
-                AssignedTo = assignedDisplayName wi
-                DescriptionHash = descriptionHash (descriptionOf wi)
-                WorkItemType = wi.Fields.WorkItemType
-                Title = wi.Fields.Title
-            }
-        )
+        |> List.map (fun wi -> string wi.Id, snapshotItemOfView (toView wi))
         |> Map.ofList
 
     let carried = previous |> Option.defaultValue AdoSnapshot.Empty

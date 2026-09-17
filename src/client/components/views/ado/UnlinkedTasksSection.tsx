@@ -160,10 +160,22 @@ interface UnlinkedSectionProps {
   ado: UseAdoSyncResult;
 }
 
+/**
+ * Kolik řádků se vykreslí, než si uživatel řekne o zbytek.
+ *
+ * Dřív to byl tvrdý strop `slice(0, 20)` bez jakéhokoli náznaku, že seznam
+ * pokračuje: v projektu s desítkami úkolů se nově založený úkol do nabídky
+ * „přidat do ADO" prostě nedostal a vypadalo to, že ho sync nevidí.
+ */
+const VISIBLE_LIMIT = 20;
+
 export function UnlinkedTasksSection({ tasks, config, role, ado }: UnlinkedSectionProps) {
   const unlinked = useMemo(() => tasksWithoutAdoLink(tasks), [tasks]);
+  const [showAll, setShowAll] = useState(false);
   const ignored = new Set(ado.decisions.ignoredUnlinkedTaskIds);
   const open = unlinked.filter((task) => !ignored.has(task.id)).length;
+  const shown = showAll ? unlinked : unlinked.slice(0, VISIBLE_LIMIT);
+  const hidden = unlinked.length - shown.length;
 
   return (
     <div style={{ marginBottom: 24 }}>
@@ -175,7 +187,7 @@ export function UnlinkedTasksSection({ tasks, config, role, ado }: UnlinkedSecti
         <div style={EMPTY_BOX}>Všechny úkoly mají ADO vazbu</div>
       ) : (
         <div style={PANEL}>
-          {unlinked.slice(0, 20).map((task) => (
+          {shown.map((task) => (
             <UnlinkedTaskRow
               key={task.id}
               task={task}
@@ -185,6 +197,16 @@ export function UnlinkedTasksSection({ tasks, config, role, ado }: UnlinkedSecti
               commands={ado.commands}
             />
           ))}
+          {hidden > 0 && (
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setShowAll(true)}
+              style={{ ...BTN_GHOST, width: '100%', borderRadius: 0 }}
+            >
+              Zobrazit všech {unlinked.length} úkolů (dalších {hidden})
+            </button>
+          )}
         </div>
       )}
     </div>

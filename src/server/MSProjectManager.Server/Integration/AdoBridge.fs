@@ -48,6 +48,18 @@ let private savePat deps (request: AdoRequest) (pat: string) =
         return [ Emit(AdoPatSaved(true, Some timestamp)) ]
     }
 
+/// Stav PATu po otevření záložky (FR-ADO-02).
+///
+/// PAT ani jeho existence nejdou ke klientovi v `full_state` — jsou per-user,
+/// kdežto stav projektu je sdílený. Po reloadu proto klient neví, že nějaký
+/// uložený je, a bez tohohle dotazu by nabízel „PAT není nastaven" a zakázané
+/// tlačítko synchronizace nad plně funkčním nastavením.
+let private requestStatus deps (request: AdoRequest) =
+    async {
+        let! status = patStatus deps request.ProjectId request.User.UserId
+        return [ Emit(AdoPatSaved(status.PatSet, status.UpdatedAt)) ]
+    }
+
 let private deletePat deps (request: AdoRequest) =
     async {
         let! _ = withDb deps (fun db -> AdoCredentialsRepo.deletePat db request.ProjectId request.User.UserId)
@@ -163,10 +175,11 @@ let private connected deps (request: AdoRequest) (command: AdoCommand) =
             match command with
             | AdoAcceptFromAdo(wiId, taskId, field, text) ->
                 acceptFromAdo deps credentials state (wiId, taskId, field, text)
-            | AdoPushAssignee(wiId, taskId) -> pushAssignee deps credentials state (wiId, taskId)
-            | AdoPushState(wiId, taskId, target) -> pushState deps credentials state (wiId, taskId, target)
+            | AdoPushAssignee(wiId, taskId) -> pushAssignee deps credentials state (request.ProjectId, wiId, taskId)
+            | AdoPushState(wiId, taskId, target) ->
+                pushState deps credentials state (request.ProjectId, wiId, taskId, target)
             | AdoPushDescription(wiId, taskId, text, alsoPlanner) ->
-                pushDescription deps credentials state (wiId, taskId, text, alsoPlanner)
+                pushDescription deps credentials state (request.ProjectId, wiId, taskId, text, alsoPlanner)
             | AdoCreateWorkItem(taskId, draft) ->
                 createWorkItemFor deps credentials state (credentials.Config, taskId, draft)
             | _ -> async { return [] }
@@ -179,6 +192,7 @@ let private dispatch deps (request: AdoRequest) =
     | AdoSaveConfig config -> savedConfig deps request config
     | AdoSavePat pat -> savePat deps request pat
     | AdoDeletePat -> deletePat deps request
+    | AdoRequestStatus -> requestStatus deps request
     | AdoTestConnection -> testConnection deps request
     | AdoRunSync -> AdoBridgeSync.run deps request
     | AdoAcknowledgeChange(wiId, changeType, active) -> acknowledge deps request (wiId, changeType, active)

@@ -498,6 +498,8 @@ module AdoDetection =
     open MSProjectManager.Domain.AdoSync
     open MSProjectManager.Domain.AdoChanges
 
+    module AdoMarkdown = MSProjectManager.Domain.AdoMarkdown
+
     let private wi (id: int) (state: string) (remaining: float option) : AdoWorkItem =
         {
             Id = id
@@ -618,6 +620,166 @@ module AdoDetection =
         // Hodnota odvozená ze snapshotu musí trefit klíč z detekce.
         let item = snapshotItem "In Progress" None
         Assert.Equal<string>(first, changeKey 1234 StateRegression (acknowledgedValue (Some item) StateRegression))
+
+    /// Klíč z detekce musí sedět na ten, který se ukládá do snapshotu, i tam,
+    /// kde se potvrzení na hodnotu neváže. Rozdíl přiřazení nese v `NewValue`
+    /// jméno z ADO, ale ukládá se bez něj — filtr syncu si klíč skládal přímo
+    /// z `NewValue`, takže odkliknutý rozdíl se vracel při každém dalším syncu.
+    [<Fact>]
+    let ``klíč rozdílu přiřazení hodnotu nenese`` () =
+        let change =
+            {
+                Type = PlannerAssignmentDiffers
+                Severity = SeverityMedium
+                Direction = Some PlannerToAdo
+                WiId = 1234
+                WiTitle = "WI 1234"
+                TaskId = "t1"
+                TaskName = "Úkol"
+                Details = "V plánovači: Petra | V ADO: Jan"
+                OldValue = "Petra"
+                NewValue = "Jan"
+            }
+
+        Assert.Equal<string>("1234-planner_assignment_differs", changeKeyOf change)
+        Assert.Equal<string>(changeKey 1234 PlannerAssignmentDiffers null, changeKeyOf change)
+
+    // @scenario: ado-sync.feature > Propsaná hodnota se příštím syncem nevrací
+    [<Fact>]
+    let ``srovnaná baseline po zápisu do ADO už změnu nehlásí`` () =
+        let mappings =
+            [
+                {
+                    TaskId = "t1"
+                    TaskName = "Úkol"
+                    WiIds = [ 1234 ]
+                }
+            ]
+
+        let assigned =
+            let item = wi 1234 "Done" None
+
+            { item with
+                Fields =
+                    { item.Fields with
+                        AssignedTo =
+                            Some
+                                {
+                                    DisplayName = "Petra Kolářová"
+                                    UniqueName = "petra.kolarova@firma.cz"
+                                }
+                    }
+            }
+
+        // Baseline z minulého syncu: WI byl rozpracovaný a psaný na někoho
+        // jiného. Push přiřazení i stavu tenhle rozdíl v ADO odstranil.
+        let stale =
+            snapshotWith
+                [
+                    "1234",
+                    { snapshotItem "Active" None with
+                        AssignedTo = "Jan Novák"
+                    }
+                ]
+
+        let before = inputFor stale [ assigned ] mappings |> detectChanges
+        Assert.Contains(before, (fun change -> change.Type = AssigneeChange))
+        Assert.Contains(before, (fun change -> change.Type = StateResolved))
+
+        // `refreshSnapshotItem` po pushi uloží přesně tohle.
+        let rebased = snapshotWith [ "1234", snapshotItemOfView (toView assigned) ]
+        Assert.Empty(inputFor rebased [ assigned ] mappings |> detectChanges)
+
+    /// Blok za odrážkou se dřív přilepil na poslední bod („druhý bod1. krok"),
+    /// protože `</li>` konec řádku nenechává a otevírací značka nic nedělala.
+    [<Fact>]
+    let ``blok za seznamem se nelepí na poslední odrážku`` () =
+        let withList =
+            AdoMarkdown.htmlToMarkdown "<ul><li>první bod</li><li>druhý bod</li></ul><div>Konec.</div>"
+
+        // ADO posílá seznam i bez obalu, tehdy chyběl konec řádku úplně.
+        let withoutList =
+            AdoMarkdown.htmlToMarkdown "<li>první bod</li><li>druhý bod</li><div>Konec.</div>"
+
+        Assert.DoesNotContain("bodKonec", withList)
+        Assert.DoesNotContain("bodKonec", withoutList)
+        Assert.Contains("\nKonec.", withList)
+        Assert.Contains("\nKonec.", withoutList)
+
+    // @scenario: ado-sync.feature > Rozdíl popisu se nehlásí kvůli formátování
+    [<Fact>]
+    let ``popis po cestě do ADO a zpátky se nepovažuje za změnu`` () =
+        let plannerDesc =
+            "# Zadání\n\nPrvní odstavec.\n\n- první bod\n- druhý bod\n\n"
+            + "1. krok\n2. krok\n\n**Důležité** a *zdůrazněné*."
+
+        // Přesně to, co se s popisem stane při pushi a následném syncu.
+        let roundTripped = AdoMarkdown.htmlToMarkdown (AdoMarkdown.markdownToHtml plannerDesc)
+        Assert.NotEqual<string>(plannerDesc, roundTripped)
+
+        let withDescription =
+            let item = wi 1234 "Active" None
+
+            { item with
+                Fields =
+                    { item.Fields with
+                        Description = Some(AdoMarkdown.markdownToHtml plannerDesc)
+                    }
+            }
+
+        let mappings =
+            [
+                {
+                    TaskId = "t1"
+                    TaskName = "Úkol"
+                    WiIds = [ 1234 ]
+                }
+            ]
+
+        let input =
+            { inputFor None [ withDescription ] mappings with
+                Tasks =
+                    [
+                        { task "t1" janPersonId with
+                            Desc = plannerDesc
+                        }
+                    ]
+            }
+
+        Assert.Empty(detectChanges input)
+
+    [<Fact>]
+    let ``skutečná změna popisu se hlásí dál`` () =
+        let mappings =
+            [
+                {
+                    TaskId = "t1"
+                    TaskName = "Úkol"
+                    WiIds = [ 1234 ]
+                }
+            ]
+
+        let withDescription =
+            let item = wi 1234 "Active" None
+
+            { item with
+                Fields =
+                    { item.Fields with
+                        Description = Some "<div>Popis z ADO</div>"
+                    }
+            }
+
+        let input =
+            { inputFor None [ withDescription ] mappings with
+                Tasks =
+                    [
+                        { task "t1" janPersonId with
+                            Desc = "Úplně jiný popis"
+                        }
+                    ]
+            }
+
+        Assert.Contains(detectChanges input, (fun change -> change.Type = DescriptionChange))
 
 // ── Mapování osoby na účet (FR-ROLE-07, ADR-006 doplněk) ────────────────────
 

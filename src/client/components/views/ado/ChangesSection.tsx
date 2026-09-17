@@ -2,6 +2,7 @@
 import { useMemo, useState } from 'react';
 import type { ADOConfig, ADOWorkItemView, Task, WIChange } from '../../../types';
 import type { AdoSyncCommands, UseAdoSyncResult } from '../../../hooks/useAdoSync';
+import { changeRowKey } from '../../../hooks/useAdoSync';
 import { defaultResolvedState, severityBadge } from '../../../utils/adoLinks';
 import { AdoDetailPanel } from './AdoDetailPanel';
 import { DescriptionDiffPanel } from './DescriptionDiffPanel';
@@ -12,10 +13,16 @@ interface ChangeActionsProps {
   change: WIChange;
   wi?: ADOWorkItemView;
   commands: AdoSyncCommands;
+  /**
+   * Provede akci a zároveň sundá řádek ze seznamu. Server za push ani za
+   * přebrání hodnoty žádný diff neposílá, takže bez tohohle zůstane řádek
+   * viset se stejnými tlačítky a vypadá to, že klik nic neudělal.
+   */
+  act: (run: () => void) => void;
 }
 
 /** Uzavření WI z plánovače — cílový stav závisí na procesní šabloně, proto pole. */
-function CloseInAdoAction({ change, wi, commands }: ChangeActionsProps) {
+function CloseInAdoAction({ change, wi, commands, act }: ChangeActionsProps) {
   const [state, setState] = useState(defaultResolvedState(wi?.workItemType || ''));
   return (
     <>
@@ -29,7 +36,7 @@ function CloseInAdoAction({ change, wi, commands }: ChangeActionsProps) {
       <button
         type="button"
         className="btn"
-        onClick={() => commands.pushState(change.wiId, change.taskId, state)}
+        onClick={() => act(() => commands.pushState(change.wiId, change.taskId, state))}
         style={BTN_BLUE}
       >
         Uzavřít v ADO →
@@ -38,9 +45,9 @@ function CloseInAdoAction({ change, wi, commands }: ChangeActionsProps) {
   );
 }
 
-function ChangeActions({ change, wi, commands }: ChangeActionsProps) {
+function ChangeActions({ change, wi, commands, act }: ChangeActionsProps) {
   const accept = (field: 'state' | 'assignee') =>
-    commands.acceptFromAdo({ wiId: change.wiId, taskId: change.taskId, field });
+    act(() => commands.acceptFromAdo({ wiId: change.wiId, taskId: change.taskId, field }));
 
   switch (change.type) {
     case 'state_regression':
@@ -62,7 +69,7 @@ function ChangeActions({ change, wi, commands }: ChangeActionsProps) {
           <button
             type="button"
             className="btn"
-            onClick={() => commands.pushAssignee(change.wiId, change.taskId)}
+            onClick={() => act(() => commands.pushAssignee(change.wiId, change.taskId))}
             style={BTN_BLUE}
           >
             Synchronizovat do ADO →
@@ -78,7 +85,7 @@ function ChangeActions({ change, wi, commands }: ChangeActionsProps) {
         </>
       );
     case 'planner_completed_not_ado':
-      return <CloseInAdoAction change={change} wi={wi} commands={commands} />;
+      return <CloseInAdoAction change={change} wi={wi} commands={commands} act={act} />;
     default:
       return null;
   }
@@ -95,6 +102,14 @@ interface ChangeRowProps {
 function ChangeRow({ change, wi, plannerDesc, commands, config }: ChangeRowProps) {
   const [panel, setPanel] = useState<'none' | 'diff' | 'detail'>('none');
   const style = severityBadge(change.severity);
+  // Akce mění buď plánovač, nebo ADO — v obou případech je řádek po kliknutí
+  // neaktuální. Zavře se i případný otevřený panel, aby po sobě nezůstal
+  // merge editor nad změnou, která už není v seznamu.
+  const act = (run: () => void) => {
+    run();
+    setPanel('none');
+    commands.resolveChange(change);
+  };
   // U změny popisu se rozbaluje merge editor, u ostatních jen náhled z ADO.
   const isDesc = change.type === 'description_change';
   const detail = isDesc ? 'diff' : 'detail';
@@ -121,7 +136,7 @@ function ChangeRow({ change, wi, plannerDesc, commands, config }: ChangeRowProps
           <div style={{ fontSize: 11, color: style.tx }}>{change.details}</div>
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-          <ChangeActions change={change} wi={wi} commands={commands} />
+          <ChangeActions change={change} wi={wi} commands={commands} act={act} />
           <button
             type="button"
             className="btn"
@@ -133,7 +148,7 @@ function ChangeRow({ change, wi, plannerDesc, commands, config }: ChangeRowProps
           <button
             type="button"
             className="btn"
-            onClick={() => commands.acknowledgeChange(change.wiId, change.type, true)}
+            onClick={() => commands.acknowledgeChange(change, true)}
             style={BTN_GHOST}
           >
             Potvrdit (Acknowledge)
@@ -146,6 +161,7 @@ function ChangeRow({ change, wi, plannerDesc, commands, config }: ChangeRowProps
           plannerDesc={plannerDesc}
           adoDesc={wi?.descriptionMd || ''}
           commands={commands}
+          act={act}
           onClose={() => setPanel('none')}
         />
       )}
@@ -183,7 +199,7 @@ export function ChangesSection({
         <div style={PANEL}>
           {changes.map((change) => (
             <ChangeRow
-              key={`${change.wiId}-${change.type}`}
+              key={changeRowKey(change)}
               change={change}
               wi={workItems.get(change.wiId)}
               plannerDesc={tasks.find((t) => t.id === change.taskId)?.desc || ''}

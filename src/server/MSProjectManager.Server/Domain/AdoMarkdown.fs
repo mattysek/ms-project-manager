@@ -36,6 +36,13 @@ let private stripNonContent (html: string) =
 
 /// Blokové značky na konce řádků. Pořadí je podstatné: nejdřív ty, které
 /// nesou vlastní tvar (nadpis, odrážka), teprve pak generické bloky.
+///
+/// Blok **otevírá** řádek, nejen ukončuje. `</li>` po sobě žádný konec řádku
+/// nenechává (o odsazení dalšího bodu se stará `<li>`), takže dokud otevírací
+/// značka nic nedělala, přilepil se první blok za seznamem na poslední
+/// odrážku: `<li>druhý bod</li><div>1. krok</div>` dalo „druhý bod1. krok".
+/// Slepená slova pak nešla ani přečíst v náhledu, ani porovnat s popisem
+/// v plánovači — sync na nich hlásil rozdíl pořád dokola.
 let private blocksToMarkdown (html: string) =
     html
     |> replace "<br\\s*/?>" "\n"
@@ -44,7 +51,7 @@ let private blocksToMarkdown (html: string) =
     |> replace "<li[^>]*>\\s*" "\n- "
     |> replace "</li>" ""
     |> replace "</(ul|ol|p|div|tr|table|blockquote)>" "\n"
-    |> replace "<(ul|ol|p|div|tr|table|blockquote)[^>]*>" ""
+    |> replace "<(ul|ol|p|div|tr|table|blockquote)[^>]*>" "\n"
     |> replace "<hr\\s*/?>" "\n---\n"
     |> replace "<(td|th)[^>]*>" " "
 
@@ -123,21 +130,43 @@ let markdownToHtml (markdown: string | null) : string =
 
 // ── Porovnání popisů ────────────────────────────────────────────────────────
 
-/// Normalizace před porovnáním — zrcadlí `normalizeForComparison` na klientovi.
-let normalizeForComparison (text: string | null) : string =
+/// Řádek bez blokových značek markdownu — odrážka, číslování, nadpis, citace,
+/// vodorovná čára.
+let private stripLineMarkers (line: string) =
+    line.Trim()
+    |> replace "^([-*+]|\\d+[.)])\\s+" ""
+    |> replace "^#{1,6}\\s*" ""
+    |> replace "^>\\s*" ""
+    |> replace "^(-{3,}|={3,}|\\*{3,})$" ""
+
+/// Popis zredukovaný na **holý text** — bez značek a bez rozdílů v bílých
+/// znacích.
+///
+/// Cesta popisu tam a zpět je ztrátová: plánovač drží markdown, ADO HTML, a
+/// `markdownToHtml` ∘ `htmlToMarkdown` nevrátí totéž, co do ní vstoupilo —
+/// prázdný řádek mezi odstavci zmizí, `1.` se vrátí jako `-`, nadpis přijde
+/// s jinými mezerami. Porovnání tvaru proto hlásilo rozdíl u popisů, které se
+/// liší jen tím, čím prošly, a sync nabízel „popis se liší" donekonečna —
+/// i hned po tom, co ho uživatel sám sesynchronizoval.
+///
+/// Cena je vědomá: rozdíl **jen** ve formátování (tučné navíc, odrážka místo
+/// odstavce) se nehlásí. Za tuhle slepotu se platí tím, že hlášené rozdíly
+/// jsou skutečné.
+let descriptionText (text: string | null) : string =
     match text with
     | null -> ""
     | value ->
-        value
-        |> replace "\r\n" "\n"
-        |> replace "[^\\S\n]+" " "
-        |> replace " +\n" "\n"
-        |> replace "\n{3,}" "\n\n"
+        value.Replace("\r\n", "\n").Split '\n'
+        |> Array.map stripLineMarkers
+        |> String.concat " "
+        |> replace "!?\\[([^\\]]*)\\]\\([^)]*\\)" "$1"
+        |> replace "\\*\\*|__|~~|\\*|_|`" ""
+        |> replace "\\s+" " "
         |> fun result -> result.Trim()
 
-/// Shodují se popisy po normalizaci?
+/// Shodují se popisy? Porovnává se text, ne formátování (`descriptionText`).
 let areDescriptionsEqual (left: string | null) (right: string | null) =
-    normalizeForComparison left = normalizeForComparison right
+    descriptionText left = descriptionText right
 
 /// Otisk popisu do snapshotu. Port `computeDescriptionHashSync` — 32bitová
 /// aritmetika včetně přetečení, aby hodnoty seděly s dřívějšími snapshoty.

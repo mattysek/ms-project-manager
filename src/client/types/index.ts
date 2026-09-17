@@ -362,7 +362,10 @@ export interface ADOWorkItemView {
  */
 export interface ADODecisions {
   ignoredGapIds: number[];
-  /** Klíč je `"{wiId}-{typ změny}"` — stejně jako `changeKey` na serveru. */
+  /**
+   * Klíč je `"{wiId}-{typ změny}"`, a pokud se potvrzení váže na hodnotu, ještě
+   * `-{hodnota}` — stejně jako `changeKey` na serveru (`Domain/Ado.fs`).
+   */
   acknowledgedChanges: string[];
   ignoredUnlinkedTaskIds: string[];
 }

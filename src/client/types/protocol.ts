@@ -92,6 +92,13 @@ export type ProjectCommand =
   | { type: 'ado_save_config'; config: ADOConfig }
   | { type: 'ado_save_pat'; pat: string }
   | { type: 'ado_delete_pat' }
+  /**
+   * Dotaz na stav PATu (FR-ADO-02). PAT ani informace o jeho existenci nejsou
+   * součástí `AppState` — jsou per-user — takže po reloadu klient netuší, že
+   * nějaký uložený je, a odpověď `ado_pat_saved` je jediná cesta, jak se to
+   * dozvědět bez nového uložení.
+   */
+  | { type: 'ado_request_status' }
   | { type: 'ado_test_connection' }
   | { type: 'ado_run_sync' }
   // Azure DevOps — rozhodnutí uživatele nad výsledkem (FR-ADO-06, FR-ADO-09).

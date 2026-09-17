@@ -138,3 +138,76 @@ Key ring patří do zálohy spolu s databází — jinak jsou PATy po obnově pr
 Zároveň platí, že záloha odnesená na jiný stroj je bez klíčů nepoužitelná,
 což je pro únik zálohy dobrá zpráva a pro disaster recovery špatná. Je to
 volba, ne nedopatření.
+
+## Doplněk: co všechno musí sync umět zapomenout
+
+**Status:** přijato 2026-09-17
+
+Sync hlásil změny, které žádné nebyly, a nehlásil je pryč, když už vyřešené
+byly. Čtyři různé příznaky, tři společné příčiny — všechny v tom, že
+**baseline, klíč rozhodnutí a stav PATu žijí mimo `AppState`**, a nic je
+nedrželo v souladu s tím, co uživatel právě udělal.
+
+### Po zápisu do ADO se srovnává baseline
+
+`runSync` uloží snapshot s hodnotami, které v ADO byly. Push (přiřazení, stav,
+popis) je vzápětí změní — a snapshot o tom neví. Další sync proto porovná nové
+ADO se starou baseline a nabídne uživateli k potvrzení **jeho vlastní změnu**,
+navíc obráceně: „v ADO je přiřazen někdo jiný než v plánovači" hned po tom, co
+to tam sám propsal.
+
+`AdoBridgeActions.rebaseline` proto po každém úspěšném zápisu work item znovu
+stáhne a přepíše jeho položku ve snapshotu (`refreshSnapshotItem`). Stahuje se
+znovu schválně: posíláme e-mail identity, kdežto baseline drží zobrazované
+jméno, které umí přiřadit jen ADO. Selhání dotazu akci neshodí — push proběhl,
+chyba by tvrdila opak; baseline zůstane stará a rozdíl se ohlásí jednou navíc.
+
+### Klíč potvrzení má jediný tvar
+
+Klíč nese i pozorovanou hodnotu (`1234-state_regression-New`), aby potvrzení
+platilo jen pro to, co uživatel viděl. Skládal se ale na třech místech různě:
+`withoutAcknowledged` ho bral z `WiChange.NewValue`, zápis rozhodnutí ze
+snapshotu (`acknowledgedValue`), a klient hodnotu nepřidával vůbec. Důsledek:
+odkliknutá změna se vrátila při dalším syncu, u `planner_assignment_differs`
+vždycky.
+
+Tvar klíče teď určuje `Ado.changeKeyOf` a klient ho zrcadlí jednou funkcí.
+Typy, které se na hodnotu neváží (`new_bug_child`, `planner_assignment_differs`),
+mají klíč bez ní **na obou stranách**.
+
+### Rozhodnutí uživatele ≠ odbavený řádek
+
+Push a přebrání hodnoty nevrací diff, kterým by změna ze seznamu zmizela —
+server o seznamu nic neví, ten vzniká až během syncu. Klik proto vypadal jako
+by nic neudělal. Klient si drží `resolved` (klíče řádků odbavených v téhle
+relaci) **mimo** `decisions`: není to rozhodnutí do snapshotu, příští sync tu
+změnu díky srovnané baseline stejně nenajde. Chybový diff z ADO ho vyprázdní —
+akce neproběhla, takže změna pořád platí.
+
+### Popis se porovnává jako text
+
+Plánovač drží markdown, ADO HTML, a `markdownToHtml ∘ htmlToMarkdown` není
+identita: prázdné řádky mezi odstavci zmizí, `1.` se vrátí jako `-`. Porovnání
+tvaru proto hlásilo rozdíl u popisů, které se liší jen tím, čím prošly — i hned
+po tom, co je uživatel sám sesynchronizoval. `AdoMarkdown.descriptionText`
+zredukuje obě strany na holý text (bez značek, bez rozdílů v bílých znacích) a
+teprve ten se porovnává.
+
+Při psaní testu na tohle vypadla ještě jedna vada, kterou samotné porovnání
+textu nespraví: `htmlToMarkdown` řádek jen **ukončoval**, neotevíral. `</li>`
+po sobě konec řádku nenechává (o odsazení dalšího bodu se stará `<li>`), takže
+první blok za seznamem se přilepil na poslední odrážku — `druhý bod1. krok`.
+Slepená slova se liší i jako text, a hlavně to takhle uživatel viděl v náhledu.
+Otevírací blokové značky proto nově začínají řádek.
+
+Cena je vědomá: rozdíl **jen** ve formátování se nehlásí. Za to jsou hlášené
+rozdíly skutečné, což je u seznamu, který se odklikává, důležitější.
+
+### Stav PATu si klient musí vyžádat
+
+`patSet`/`patUpdatedAt` jsou per-user, takže nejsou v `AppState` a nepřijdou
+s `full_state`. Klient je znal jen jako odpověď na vlastní uložení PATu — po
+reloadu tedy tvrdil „PAT není nastaven" a **zakázal synchronizaci** nad plně
+funkčním nastavením. Command `ado_request_status` vrací `ado_pat_saved`
+odesílateli; view se ptá při vstupu na záložku a po návratu online. PAT
+samotný se tím ke klientovi nedostane — vrací se jen příznak a čas.

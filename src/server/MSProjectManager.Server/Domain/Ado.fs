@@ -229,6 +229,23 @@ let acknowledgedValue (item: AdoSnapshotItem option) (changeType: WiChangeType) 
         | NewBugChild
         | PlannerAssignmentDiffers -> null
 
+/// Hodnota, na kterou se potvrzení váže, odvozená z **detekované změny**.
+///
+/// Zrcadlí `acknowledgedValue` — u typů, které se na hodnotu neváží, musí
+/// vrátit `null` i tehdy, když změna nějakou nese: `planner_assignment_differs`
+/// má v `NewValue` jméno z ADO, ale potvrzení se ukládá bez něj. Dřív si
+/// filtr syncu klíč skládal přímo z `NewValue`, takže odkliknutý rozdíl
+/// přiřazení se při každém dalším syncu vynořil znovu.
+let acknowledgedValueOf (change: WiChange) : string | null =
+    match change.Type with
+    | NewBugChild
+    | PlannerAssignmentDiffers -> null
+    | _ -> change.NewValue
+
+/// Klíč potvrzení pro konkrétní detekovanou změnu.
+let changeKeyOf (change: WiChange) =
+    changeKey change.WiId change.Type (acknowledgedValueOf change)
+
 /// Závažnost odvozená od typu změny (FR-ADO-05).
 let severityOf (changeType: WiChangeType) =
     match changeType with

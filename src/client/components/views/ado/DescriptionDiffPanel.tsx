@@ -112,6 +112,8 @@ interface DescriptionDiffPanelProps {
   plannerDesc: string;
   adoDesc: string;
   commands: AdoSyncCommands;
+  /** Provede akci a odbaví řádek změny — viz `ChangeActionsProps.act`. */
+  act: (run: () => void) => void;
   onClose: () => void;
 }
 
@@ -120,6 +122,7 @@ export function DescriptionDiffPanel({
   plannerDesc,
   adoDesc,
   commands,
+  act,
   onClose,
 }: DescriptionDiffPanelProps) {
   const blocks = useMemo(() => computeDiffBlocks(plannerDesc, adoDesc), [plannerDesc, adoDesc]);
@@ -182,7 +185,7 @@ export function DescriptionDiffPanel({
         <button
           type="button"
           className="btn"
-          onClick={() => commands.acceptFromAdo({ ...args, field: 'description', text })}
+          onClick={() => act(() => commands.acceptFromAdo({ ...args, field: 'description', text }))}
           style={BTN_BLUE}
         >
           ← Přijmout z ADO
@@ -190,7 +193,7 @@ export function DescriptionDiffPanel({
         <button
           type="button"
           className="btn"
-          onClick={() => commands.pushDescription({ ...args, text, alsoPlanner: false })}
+          onClick={() => act(() => commands.pushDescription({ ...args, text, alsoPlanner: false }))}
           style={BTN_BLUE}
         >
           → Synchronizovat do ADO
@@ -198,7 +201,7 @@ export function DescriptionDiffPanel({
         <button
           type="button"
           className="btn"
-          onClick={() => commands.pushDescription({ ...args, text, alsoPlanner: true })}
+          onClick={() => act(() => commands.pushDescription({ ...args, text, alsoPlanner: true }))}
           style={BTN_GREEN}
         >
           ↔ Uložit merge (obousměrně)

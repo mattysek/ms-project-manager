@@ -59,6 +59,7 @@ const NO_STATE_CHANGE_TYPES = [
   'redo',
   'ado_delete_pat',
   'ado_save_pat',
+  'ado_request_status',
   'ado_test_connection',
   'ado_run_sync',
   'ado_acknowledge_change',

@@ -335,6 +335,26 @@ describe('AdoSyncView — spuštění synchronizace', () => {
     expect(screen.getByRole('button', { name: /Synchronizovat/ })).toBeDisabled();
   });
 
+  // @scenario: ado-sync.feature > Stav PATu přežije reload stránky
+  // Stav PATu není v `AppState` (je per-user), takže po reloadu o něm klient
+  // neví nic: bez dotazu tvrdil „PAT není nastaven" a nepustil ani sync, i
+  // když PAT na serveru celou dobu byl.
+  it('při vstupu na záložku se ptá serveru na stav PATu', () => {
+    const { commandsOf, send } = setup();
+
+    expect(commandsOf('ado_request_status')).toHaveLength(1);
+
+    send({ op: 'ado_pat_saved', patSet: true, patUpdatedAt: '2026-08-11T14:30:00.000Z' });
+    openConfig();
+    expect(screen.getByText(/PAT uložen/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Synchronizovat/ })).toBeEnabled();
+  });
+
+  it('Dev se na stav PATu neptá (command je PM-only) a offline taky ne', () => {
+    expect(setup({ role: 'dev' }).commandsOf('ado_request_status')).toHaveLength(0);
+    expect(setup({ isOffline: true }).commandsOf('ado_request_status')).toHaveLength(0);
+  });
+
   // @scenario: offline.feature > ADO Sync je zakázán při offline
   it('offline je sync zakázaný a tlačítko má tooltip s vysvětlením (FR-OFFLINE-07)', () => {
     const { withPat } = setup({ isOffline: true });
@@ -480,6 +500,53 @@ describe('AdoSyncView — změny směrem do ADO (FR-ADO-07)', () => {
       taskId: 't1',
       state: 'Done',
     });
+  });
+});
+
+describe('AdoSyncView — odbavení řádku po akci', () => {
+  const completed = makeChange({
+    type: 'planner_completed_not_ado',
+    severity: 'medium',
+    direction: 'planner_to_ado',
+    details: 'Úkol je na 100%, ale WI je stále "In Progress"',
+  });
+
+  // @scenario: ado-sync.feature > Akce nad změnou ji odbaví ze seznamu
+  // Server za push žádný diff neposílá — bez lokálního odbavení zůstal řádek
+  // viset se stejnými tlačítky a vypadalo to, že klik nic neudělal.
+  it('po odeslání akce řádek zmizí ze seznamu změn', () => {
+    const { send } = setup();
+
+    send(syncCompleted([completed], [], [makeWi()]));
+    click('Uzavřít v ADO →');
+
+    expect(screen.queryByText(completed.details)).not.toBeInTheDocument();
+  });
+
+  // @scenario: ado-sync.feature > Odmítnutá akce vrátí změnu zpět
+  it('odmítnutá akce řádek vrátí — změna pořád platí', () => {
+    const { send } = setup();
+
+    send(syncCompleted([completed], [], [makeWi()]));
+    click('Uzavřít v ADO →');
+    send({ op: 'error', message: 'Úkol už neexistuje', commandType: 'ado_push_state' });
+
+    expect(screen.getByText(completed.details)).toBeInTheDocument();
+  });
+
+  it('odbavení platí jen pro dotčený řádek, ostatní změny zůstanou', () => {
+    const { send } = setup();
+
+    send(
+      syncCompleted(
+        [completed, makeChange({ type: 'description_change', severity: 'sync' })],
+        [],
+        [makeWi()]
+      )
+    );
+    click('Uzavřít v ADO →');
+
+    expect(screen.getByText('Stav WI regredoval zpět na In Progress')).toBeInTheDocument();
   });
 });
 
@@ -637,6 +704,29 @@ describe('AdoSyncView — push úkolu do ADO', () => {
     setup();
 
     expect(screen.queryByText('API refaktoring')).not.toBeInTheDocument();
+  });
+
+  it('úkol bez přiřazené osoby se nabízí taky — WI bez assignee je v ADO legální', () => {
+    const backlog: Task = { ...TASKS[1], id: 't3', p: '', name: 'Nezařazený úkol' };
+    setup({ tasks: [...TASKS, backlog] });
+
+    expect(screen.getByText('Nezařazený úkol')).toBeInTheDocument();
+  });
+
+  // @scenario: ado-sync.feature > Úkoly bez ADO linku se nabízejí všechny
+  // Dřív byl seznam natvrdo uříznutý na dvaceti řádcích bez náznaku, že
+  // pokračuje — nově založený úkol se do nabídky prostě nedostal.
+  it('u dlouhého seznamu nabídne zbytek místo tichého uříznutí', () => {
+    const many: Task[] = Array.from({ length: 25 }, (_, index) => ({
+      ...TASKS[1],
+      id: `t${index + 10}`,
+      name: `Úkol ${index + 1}`,
+    }));
+    setup({ tasks: many });
+
+    expect(screen.queryByText('Úkol 25')).not.toBeInTheDocument();
+    click(/Zobrazit všech 25 úkolů/);
+    expect(screen.getByText('Úkol 25')).toBeInTheDocument();
   });
 });
 

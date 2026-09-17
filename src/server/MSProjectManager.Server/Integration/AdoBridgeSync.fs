@@ -60,8 +60,7 @@ let private withoutAcknowledged (snapshot: AdoSnapshot option) (changes: WiChang
     | Some value ->
         let seen = Set.ofList value.AcknowledgedChanges
 
-        changes
-        |> List.filter (fun change -> not (seen.Contains(changeKey change.WiId change.Type change.NewValue)))
+        changes |> List.filter (fun change -> not (seen.Contains(changeKeyOf change)))
 
 let private runSync (deps: BridgeDependencies) (request: AdoRequest) credentials =
     async {

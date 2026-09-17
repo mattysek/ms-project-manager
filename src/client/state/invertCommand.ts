@@ -87,6 +87,7 @@ const NON_INVERTIBLE_TYPES = [
   'update_presence',
   'ado_save_pat',
   'ado_delete_pat',
+  'ado_request_status',
   'ado_test_connection',
   'ado_run_sync',
   'ado_acknowledge_change',

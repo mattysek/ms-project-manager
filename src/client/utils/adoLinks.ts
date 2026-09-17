@@ -19,9 +19,16 @@ export function buildWiUrl(config: { orgUrl: string; project: string }, id: numb
   return `${config.orgUrl}/${encodeURIComponent(config.project)}/_workitems/edit/${id}`;
 }
 
-/** Úkoly bez vazby na ADO (FR-ADO-08). Backlog (osoba nepřiřazena) se přeskakuje. */
+/**
+ * Úkoly bez vazby na ADO (FR-ADO-08).
+ *
+ * Bez podmínky na osobu: dřív se úkoly z backlogu přeskakovaly s odůvodněním,
+ * že „nemají koho v ADO přiřadit", jenže work item bez přiřazení je v ADO
+ * naprosto legální a uživatel neměl jak zjistit, proč čerstvě založený úkol
+ * v nabídce „přidat do ADO" chybí. Přiřazení ve formuláři zůstává nepovinné.
+ */
 export function tasksWithoutAdoLink(tasks: Task[]): Task[] {
-  return tasks.filter((task) => task.p && !task.links?.some((link) => isAdoUrl(link.url)));
+  return tasks.filter((task) => !task.links?.some((link) => isAdoUrl(link.url)));
 }
 
 // ── MD ↔ hodiny (FR-ADO-01, `mdToHoursCoefficient`) ─────────────────────────

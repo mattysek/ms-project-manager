@@ -242,7 +242,7 @@ describe('useAdoSync — rozhodnutí uživatele', () => {
     const { dispatch, result, send } = setup();
     send(syncCompleted([makeChange()], []));
 
-    act(() => result.current.commands.acknowledgeChange(1234, 'state_regression', true));
+    act(() => result.current.commands.acknowledgeChange(makeChange(), true));
 
     expect(dispatch).toHaveBeenCalledWith({
       type: 'ado_acknowledge_change',
@@ -256,9 +256,56 @@ describe('useAdoSync — rozhodnutí uživatele', () => {
     send(
       syncCompleted([makeChange()], [], {
         ...emptyDecisions,
-        acknowledgedChanges: ['1234-state_regression'],
+        acknowledgedChanges: ['1234-state_regression-In Progress'],
       })
     );
+    expect(result.current.visibleChanges).toEqual([]);
+  });
+
+  // @scenario: ado-sync.feature > Potvrzení platí jen pro viděnou hodnotu
+  it('klíč potvrzení nese i viděnou hodnotu — jinak by ho sync neuměl spárovat', () => {
+    const { result, send } = setup();
+    send(syncCompleted([makeChange()], []));
+
+    // Přesně ten klíč, který uloží server (`changeKey` v Domain/Ado.fs).
+    act(() => result.current.commands.acknowledgeChange(makeChange(), true));
+    send(
+      syncCompleted([makeChange()], [], {
+        ...emptyDecisions,
+        acknowledgedChanges: ['1234-state_regression-In Progress'],
+      })
+    );
+    expect(result.current.visibleChanges).toEqual([]);
+
+    // Horší regrese na stejném WI je jiná hodnota, takže se ukáže znovu.
+    send(
+      syncCompleted([makeChange({ newValue: 'New', oldValue: 'Done' })], [], {
+        ...emptyDecisions,
+        acknowledgedChanges: ['1234-state_regression-In Progress'],
+      })
+    );
+    expect(result.current.visibleChanges).toHaveLength(1);
+  });
+
+  it('rozdíl přiřazení se potvrzuje bez hodnoty — server ji do klíče nedává', () => {
+    const { result, send } = setup();
+    const differs = makeChange({
+      type: 'planner_assignment_differs',
+      severity: 'medium',
+      direction: 'planner_to_ado',
+      oldValue: 'Petra Kolářová',
+      newValue: 'Jan Novák',
+    });
+    send(syncCompleted([differs], []));
+
+    act(() => result.current.commands.acknowledgeChange(differs, true));
+    send(
+      syncCompleted([differs], [], {
+        ...emptyDecisions,
+        acknowledgedChanges: ['1234-planner_assignment_differs'],
+      })
+    );
+
     expect(result.current.visibleChanges).toEqual([]);
   });
 
@@ -271,7 +318,7 @@ describe('useAdoSync — rozhodnutí uživatele', () => {
       )
     );
 
-    act(() => result.current.commands.acknowledgeChange(1234, 'state_regression', true));
+    act(() => result.current.commands.acknowledgeChange(makeChange(), true));
 
     expect(result.current.visibleChanges.map((change) => change.type)).toEqual([
       'description_change',
@@ -281,9 +328,9 @@ describe('useAdoSync — rozhodnutí uživatele', () => {
   it('odvolané potvrzení změnu vrátí zpět do seznamu', () => {
     const { result, send } = setup();
     send(syncCompleted([makeChange()], []));
-    act(() => result.current.commands.acknowledgeChange(1234, 'state_regression', true));
+    act(() => result.current.commands.acknowledgeChange(makeChange(), true));
 
-    act(() => result.current.commands.acknowledgeChange(1234, 'state_regression', false));
+    act(() => result.current.commands.acknowledgeChange(makeChange(), false));
 
     expect(result.current.visibleChanges).toHaveLength(1);
   });

@@ -100,6 +100,7 @@ let commandTypeHint (command: AdoCommand) =
     | AdoTestConnection -> "ado_test_connection"
     | AdoSavePat _ -> "ado_save_pat"
     | AdoDeletePat -> "ado_delete_pat"
+    | AdoRequestStatus -> "ado_request_status"
     | AdoSaveConfig _ -> "ado_save_config"
     | _ -> "ado"
 

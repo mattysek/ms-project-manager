@@ -37,7 +37,6 @@ import type {
   ADOWorkItemView,
   Task,
   WIChange,
-  WIChangeType,
 } from '../types';
 import type { ProjectCommand, ProjectDiff } from '../types/protocol';
 
@@ -89,9 +88,16 @@ export interface AdoSyncCommands {
   saveConfig: (config: ADOConfig) => void;
   savePat: (pat: string) => void;
   deletePat: () => void;
+  /** Dotaz na stav PATu — po reloadu ho klient jinak nemá odkud znát. */
+  requestStatus: () => void;
   testConnection: () => void;
   runSync: () => void;
-  acknowledgeChange: (wiId: number, changeType: WIChangeType, acknowledged: boolean) => void;
+  acknowledgeChange: (change: WIChange, acknowledged: boolean) => void;
+  /**
+   * Odbaví řádek změny lokálně, bez serveru: po akci (push, přebrání, merge)
+   * už neplatí, ale server za ni žádný diff neposílá.
+   */
+  resolveChange: (change: WIChange) => void;
   ignoreGap: (wiId: number, ignored: boolean) => void;
   ignoreUnlinkedTask: (taskId: string, ignored: boolean) => void;
   acceptFromAdo: (args: AdoAcceptFromAdoArgs) => void;
@@ -111,6 +117,16 @@ export interface AdoSyncState {
   syncing: boolean;
   result: AdoSyncResult | null;
   decisions: ADODecisions;
+  /**
+   * Řádky změn odbavené v téhle relaci akcí uživatele (klíče `changeRowKey`).
+   *
+   * Server na push ani na přebrání hodnoty neposílá diff, který by změnu ze
+   * seznamu sundal — po akci by řádek zůstal viset se stejnými tlačítky a
+   * vypadalo by to, že klik nic neudělal. Drží se mimo `decisions`, protože
+   * to není rozhodnutí do snapshotu: příští sync už tu změnu nenajde
+   * (baseline se po zápisu do ADO srovná na serveru).
+   */
+  resolved: string[];
   /** Poslední přírůstek sync logu — pro potvrzovací hlášku po akci (FR-ADO-10). */
   lastLogEntry: ADOSyncLogEntry | null;
 }
@@ -142,16 +158,44 @@ const INITIAL_STATE: AdoSyncState = {
   syncing: false,
   result: null,
   decisions: EMPTY_DECISIONS,
+  resolved: [],
   lastLogEntry: null,
 };
+
+/**
+ * Hodnota, na kterou se potvrzení váže. Zrcadlí `acknowledgedValueOf`
+ * (`Domain/Ado.fs`): u typů, které se na hodnotu neváží, je klíč bez ní,
+ * i když změna nějakou nese.
+ */
+function acknowledgedValue(change: WIChange): string | null {
+  if (change.type === 'new_bug_child' || change.type === 'planner_assignment_differs') return null;
+  return change.newValue === undefined || change.newValue === null ? null : String(change.newValue);
+}
 
 /**
  * Klíč rozhodnutí nad změnou. Musí se **doslova** shodovat se serverovým
  * `changeKey` (`Domain/Ado.fs`), jinak by si obě strany filtrovaly podle
  * jiného klíče a potvrzené změny by se vracely.
+ *
+ * Součástí je i pozorovaná hodnota — bez ní platilo potvrzení pro daný typ
+ * změny na daném WI navždy. Klient ji dřív do klíče nedával vůbec, takže
+ * odklikaná změna se při dalším syncu vrátila: server ji filtroval podle
+ * `1234-state_regression-New`, klient hledal `1234-state_regression`.
  */
-function changeKey(wiId: number, changeType: WIChangeType): string {
-  return `${wiId}-${changeType}`;
+function changeKey(change: WIChange): string {
+  const value = acknowledgedValue(change);
+  return value === null
+    ? `${change.wiId}-${change.type}`
+    : `${change.wiId}-${change.type}-${value}`;
+}
+
+/**
+ * Identita **řádku** v seznamu změn. Na rozdíl od klíče potvrzení nese i úkol:
+ * na jeden work item můžou odkazovat dva úkoly a změna se pak zobrazuje u
+ * obou (`ado-sync.feature > Dva úkoly odkazující na stejný WI`).
+ */
+export function changeRowKey(change: WIChange): string {
+  return `${change.wiId}-${change.type}-${change.taskId}`;
 }
 
 /** Zapne/vypne položku v seznamu rozhodnutí — obdoba `toggle` na serveru. */
@@ -181,6 +225,9 @@ function syncCompleted(
     // Rozhodnutí jsou autoritativně ve snapshotu na serveru — čerstvý sync je
     // přebije, včetně těch, která mezitím udělal jiný PM.
     decisions: diff.context.decisions,
+    // Čerstvý výsledek je nová pravda: co v něm je, je stále aktuální, ať už
+    // jsme na to minule klikli nebo ne.
+    resolved: [],
   };
 }
 
@@ -206,20 +253,32 @@ export function reduceAdoDiff(state: AdoSyncState, diff: ProjectDiff): AdoSyncSt
     case 'ado_sync_log_appended':
       return { ...state, lastLogEntry: diff.entry };
     // Chyba syncu nedorazí jako `ado_sync_completed`, takže bez tohohle by
-    // indikátor „synchronizuji…" zůstal viset navždy.
+    // indikátor „synchronizuji…" zůstal viset navždy. Odmítnutá ADO akce
+    // zároveň vrací zpět řádky odbavené lokálně — akce neproběhla, takže
+    // změna pořád platí a uživatel se k ní musí umět vrátit.
     case 'error':
-      return diff.commandType === 'ado_run_sync'
-        ? { ...state, syncing: false, progress: null }
-        : state;
+      if (!diff.commandType.startsWith('ado')) return state;
+      return {
+        ...state,
+        resolved: [],
+        ...(diff.commandType === 'ado_run_sync' ? { syncing: false, progress: null } : {}),
+      };
     default:
       return state;
   }
 }
 
-function visibleChangesOf(result: AdoSyncResult | null, decisions: ADODecisions): WIChange[] {
+function visibleChangesOf(
+  result: AdoSyncResult | null,
+  decisions: ADODecisions,
+  resolved: string[]
+): WIChange[] {
   if (!result) return [];
   const acknowledged = new Set(decisions.acknowledgedChanges);
-  return result.changes.filter((change) => !acknowledged.has(changeKey(change.wiId, change.type)));
+  const done = new Set(resolved);
+  return result.changes.filter(
+    (change) => !acknowledged.has(changeKey(change)) && !done.has(changeRowKey(change))
+  );
 }
 
 function visibleGapsOf(result: AdoSyncResult | null, decisions: ADODecisions): ADOWorkItemView[] {
@@ -237,6 +296,7 @@ function useSetupCommands(dispatch: Dispatch) {
       saveConfig: (config: ADOConfig) => dispatch({ type: 'ado_save_config', config }),
       savePat: (pat: string) => dispatch({ type: 'ado_save_pat', pat }),
       deletePat: () => dispatch({ type: 'ado_delete_pat' }),
+      requestStatus: () => dispatch({ type: 'ado_request_status' }),
       testConnection: () => dispatch({ type: 'ado_test_connection' }),
     }),
     [dispatch]
@@ -247,13 +307,18 @@ function useSetupCommands(dispatch: Dispatch) {
 function useDecisionCommands(dispatch: Dispatch, updateDecisions: DecisionUpdater) {
   return useMemo(
     () => ({
-      acknowledgeChange: (wiId: number, changeType: WIChangeType, acknowledged: boolean) => {
-        dispatch({ type: 'ado_acknowledge_change', wiId, changeType, acknowledged });
+      acknowledgeChange: (change: WIChange, acknowledged: boolean) => {
+        dispatch({
+          type: 'ado_acknowledge_change',
+          wiId: change.wiId,
+          changeType: change.type,
+          acknowledged,
+        });
         updateDecisions((decisions) => ({
           ...decisions,
           acknowledgedChanges: toggle(
             decisions.acknowledgedChanges,
-            changeKey(wiId, changeType),
+            changeKey(change),
             acknowledged
           ),
         }));
@@ -313,6 +378,12 @@ export function useAdoSync(dispatch: Dispatch): UseAdoSyncResult {
     setState((prev) => ({ ...prev, decisions: change(prev.decisions) }));
   }, []);
 
+  // Odbavení řádku po akci. Nejde na server: ten si o výsledku push/přebrání
+  // vede sync log a baseline, ale seznam změn je výsledek běhu, ne stav.
+  const resolveChange = useCallback((change: WIChange) => {
+    setState((prev) => ({ ...prev, resolved: [...prev.resolved, changeRowKey(change)] }));
+  }, []);
+
   // `syncing` se zapíná už při odeslání commandu, ne až prvním
   // `ado_sync_progress` — mezi klikem a první zprávou ze serveru je round-trip,
   // po který by tlačítko zůstalo aktivní a šlo by sync spustit dvakrát.
@@ -326,13 +397,13 @@ export function useAdoSync(dispatch: Dispatch): UseAdoSyncResult {
   const actions = useActionCommands(dispatch);
 
   const commands = useMemo(
-    () => ({ ...setup, ...decisions, ...actions, runSync }),
-    [setup, decisions, actions, runSync]
+    () => ({ ...setup, ...decisions, ...actions, runSync, resolveChange }),
+    [setup, decisions, actions, runSync, resolveChange]
   );
 
   const visibleChanges = useMemo(
-    () => visibleChangesOf(state.result, state.decisions),
-    [state.result, state.decisions]
+    () => visibleChangesOf(state.result, state.decisions, state.resolved),
+    [state.result, state.decisions, state.resolved]
   );
   const visibleGaps = useMemo(
     () => visibleGapsOf(state.result, state.decisions),
