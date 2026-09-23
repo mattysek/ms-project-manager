@@ -51,6 +51,10 @@ export function useNoteEditor(options: UseNoteEditorOptions): UseNoteEditorResul
   // (scénář „Autosave během psaní" by ztrácel poslední znaky).
   // biome-ignore lint/correctness/useExhaustiveDependencies: záměrně jen [note?.id], viz komentář výše
   useEffect(() => {
+    // Draft, který se právě uložil, dostane od parenta své id (`onPersisted`).
+    // To není přepnutí na jinou poznámku — reset by zahodil, co uživatel
+    // stihl dopsat, zatímco se čekalo na server.
+    if (note && note.id === noteIdRef.current) return;
     setContent(note?.content ?? '');
     setLinkedProjectId(note?.linkedProjectId ?? null);
     noteIdRef.current = note?.id ?? null;

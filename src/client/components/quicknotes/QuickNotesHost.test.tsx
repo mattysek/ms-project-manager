@@ -1,16 +1,17 @@
 // Testy QuickNotesHost — přístup k panelu z hlavičky, nezávisle na view/projektu
 // (PRD-04, FR-QN-01).
-import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
-import { QuickNotesHost } from './QuickNotesHost';
-import { useOpenPanel } from '../../hooks/useOpenPanel';
-import { useQuickNotes } from '../../hooks/useQuickNotes';
-import * as quickNotesApi from '../../api/quickNotesApi';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ProjectSummary } from '../../api/projectsApi';
 import * as projectsApi from '../../api/projectsApi';
 import type { QuickNote } from '../../api/quickNotesApi';
-import type { ProjectSummary } from '../../api/projectsApi';
+import * as quickNotesApi from '../../api/quickNotesApi';
+import { useOpenPanel } from '../../hooks/useOpenPanel';
+import { useQuickNotes } from '../../hooks/useQuickNotes';
+import { QuickNotesHost } from './QuickNotesHost';
 
 function note(overrides: Partial<QuickNote> = {}): QuickNote {
   return {
@@ -42,13 +43,12 @@ function projectSummary(overrides: Partial<ProjectSummary> = {}): ProjectSummary
 // Data (`useQuickNotes`) i otevřenost panelu drží volající, stejně jako
 // v `AuthenticatedApp` — otevřenost je společná pro oba panely (`useOpenPanel`),
 // takže si ji host nesmí držet sám.
-function Harness({ activeProjectId = 'p1' as string | null } = {}) {
+function Harness() {
   const notes = useQuickNotes();
   const panel = useOpenPanel();
   return (
     <QuickNotesHost
       notes={notes}
-      activeProjectId={activeProjectId}
       onConvert={vi.fn()}
       open={panel.open === 'notes'}
       onToggle={() => panel.toggle('notes')}
@@ -71,7 +71,6 @@ function ViewSwitchHarness() {
       </button>
       <QuickNotesHost
         notes={notes}
-        activeProjectId="p1"
         onConvert={vi.fn()}
         open={panel.open === 'notes'}
         onToggle={() => panel.toggle('notes')}
@@ -155,7 +154,7 @@ describe('QuickNotesHost', () => {
       note({ content: 'Nezávislá poznámka' }),
     ]);
     vi.spyOn(projectsApi, 'listProjects').mockResolvedValue([projectSummary()]);
-    render(<Harness activeProjectId={null} />);
+    render(<Harness />);
 
     await userEvent.click(screen.getByRole('button', { name: /📝 Poznámky/ }));
 

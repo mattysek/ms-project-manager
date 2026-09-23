@@ -118,7 +118,7 @@ Feature: Quick Notes — osobní poznámky
 
   Scenario: Konverze poznámky na úkol
     Given "petra.kolarova" má otevřený projekt "Backend refaktoring"
-    And má poznámku "Implementovat rate limiting pro API endpoint /users"
+    And má poznámku "Implementovat rate limiting pro API endpoint /users" přiřazenou k projektu "Backend refaktoring"
     When otevře tuto poznámku
     And klikne na "→ Přidat jako úkol"
     Then se otevře TaskDetailModal s předvyplněnými daty:
@@ -131,11 +131,33 @@ Feature: Quick Notes — osobní poznámky
     And poznámka je označena jako konvertovaná: zobrazuje tag "→ Úkol: Implementovat rate limiting…"
     And poznámka je read-only (nelze konvertovat znovu)
 
-  Scenario: Tlačítko konverze je neaktivní bez otevřeného projektu
-    Given "petra.kolarova" je na LandingPage (žádný projekt neotevřen)
-    And otevře Quick Notes panel
-    When klikne na poznámku
-    Then tlačítko "→ Přidat jako úkol" je neaktivní nebo skryté
+  Scenario: Právě napsanou poznámku lze hned převést na úkol
+    # Nová poznámka dřív po uložení v editoru dál vystupovala jako neuložená,
+    # takže tlačítko zůstalo zašedlé, dokud ji uživatel znovu neotevřel ze
+    # seznamu — vypadalo to, že převod smí jen PM.
+    Given "petra.kolarova" je v projektu "Backend refaktoring" Dev
+    When klikne na "+ Nová poznámka", napíše text a přiřadí poznámku k projektu "Backend refaktoring"
+    Then tlačítko "→ Přidat jako úkol" je aktivní bez opětovného otevření poznámky
+
+  Scenario: Konverze otevře úkol v projektu poznámky
+    Given "petra.kolarova" je na stránce se seznamem projektů
+    And má poznámku "Doplnit audit log" přiřazenou k projektu "Frontend redesign"
+    When klikne u poznámky na "→ Přidat jako úkol"
+    Then se otevře projekt "Frontend redesign" na záložce Úkoly
+    And nad ní TaskDetailModal s předvyplněnými daty
+    When klikne "Uložit"
+    Then úkol "Doplnit audit log" je vytvořen v projektu "Frontend redesign"
+    And nad záložkou Úkoly je rovnou otevřený jeho detail
+
+  Scenario: Dev smí úkol z poznámky přiřadit jen sobě nebo do backlogu
+    Given "petra.kolarova" je v projektu "Backend refaktoring" Dev
+    When převádí poznámku na úkol
+    Then v poli „Přiřazeno" nabízí formulář jen Backlog a osobu namapovanou na její účet
+
+  Scenario: Tlačítko konverze je neaktivní u poznámky bez projektu
+    Given "petra.kolarova" má poznámku, která není přiřazená k žádnému projektu
+    When ji otevře
+    Then tlačítko "→ Přidat jako úkol" je neaktivní
 
   Scenario: Fulltext vyhledávání v poznámkách
     Given "petra.kolarova" má 5 poznámek, z nichž 2 obsahují slovo "rate limiting"

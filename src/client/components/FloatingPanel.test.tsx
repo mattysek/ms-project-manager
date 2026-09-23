@@ -6,10 +6,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { FloatingPanel } from './FloatingPanel';
-import { TOP_BAR_HEIGHT } from './TopBar';
 import { LAYERS } from '../constants/layers';
+import { FloatingPanel } from './FloatingPanel';
 import { QuickNotesPanel } from './quicknotes/QuickNotesPanel';
+import { TOP_BAR_HEIGHT } from './TopBar';
 import { VaultPanel } from './vault/VaultPanel';
 
 function renderPanel(over: Partial<React.ComponentProps<typeof FloatingPanel>> = {}) {
@@ -123,13 +123,7 @@ describe('Poznámky a trezor sdílí rám', () => {
   // @scenario: quick-notes.feature > Panel poznámek vypadá stejně jako trezor
   it('oba panely mají shodnou polohu, šířku i orámování', () => {
     const notes = render(
-      <QuickNotesPanel
-        notes={notesStub}
-        projects={[]}
-        canConvert={false}
-        onConvert={vi.fn()}
-        onClose={vi.fn()}
-      />
+      <QuickNotesPanel notes={notesStub} projects={[]} onConvert={vi.fn()} onClose={vi.fn()} />
     );
     const notesFrame = frameOf(notes.getByRole('dialog', { name: 'Quick Notes' }));
     notes.unmount();
@@ -144,13 +138,7 @@ describe('Poznámky a trezor sdílí rám', () => {
 
   it('oba mají v hlavičce ikonu a zavírací křížek', () => {
     const notes = render(
-      <QuickNotesPanel
-        notes={notesStub}
-        projects={[]}
-        canConvert={false}
-        onConvert={vi.fn()}
-        onClose={vi.fn()}
-      />
+      <QuickNotesPanel notes={notesStub} projects={[]} onConvert={vi.fn()} onClose={vi.fn()} />
     );
     expect(notes.getByText('📝 Moje poznámky')).toBeInTheDocument();
     expect(notes.getByLabelText('Zavřít poznámky')).toBeInTheDocument();

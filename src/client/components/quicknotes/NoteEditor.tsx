@@ -2,9 +2,9 @@
 // projekt (FR-QN-06), konverze na úkol (FR-QN-07), smazání (FR-QN-05).
 import { useState } from 'react';
 import type { QuickNote } from '../../api/quickNotesApi';
+import { QUICK_NOTE_MAX_CHARS } from '../../hooks/useQuickNotes';
 import { markdownToHtml } from '../../utils/htmlMarkdownConverter';
 import { useNoteEditor } from './useNoteEditor';
-import { QUICK_NOTE_MAX_CHARS } from '../../hooks/useQuickNotes';
 
 interface ProjectOption {
   id: string;
@@ -14,7 +14,6 @@ interface ProjectOption {
 interface NoteEditorProps {
   note: QuickNote | null;
   projects: ProjectOption[];
-  canConvert: boolean;
   onCreate: (content: string, linkedProjectId: string | null) => Promise<QuickNote | null>;
   onSave: (
     id: string,
@@ -22,6 +21,10 @@ interface NoteEditorProps {
     linkedProjectId: string | null
   ) => Promise<QuickNote | null>;
   onDelete: (id: string) => Promise<void>;
+  /**
+   * Převod na úkol. Dostává poznámku s obsahem a projektem **z editoru** —
+   * autosave může být ještě v běhu a úkol vzniká v projektu poznámky.
+   */
   onConvert: (note: QuickNote) => void;
   onPersisted: (note: QuickNote) => void;
   onBack: () => void;
@@ -75,16 +78,25 @@ function EditorToolbar({
   );
 }
 
+/**
+ * Úkol vzniká v projektu, ke kterému poznámka patří — u nepřiřazené poznámky
+ * není kam ho dát, takže převod nejde.
+ */
+function convertTitle(note: QuickNote | null, linkedProjectId: string | null): string | undefined {
+  if (!note || note.convertedToTaskId) return undefined;
+  return linkedProjectId ? undefined : 'Přiřaďte poznámku k projektu pro přidání úkolu';
+}
+
 function EditorActions({
   note,
-  canConvert,
+  linkedProjectId,
   onDelete,
   onConvert,
 }: {
   note: QuickNote | null;
-  canConvert: boolean;
+  linkedProjectId: string | null;
   onDelete: () => void;
-  onConvert: (note: QuickNote) => void;
+  onConvert: () => void;
 }) {
   return (
     <div style={{ display: 'flex', gap: 8 }}>
@@ -106,9 +118,9 @@ function EditorActions({
       <button
         type="button"
         className="btn"
-        disabled={!note || !!note.convertedToTaskId || !canConvert}
-        onClick={() => note && onConvert(note)}
-        title={!canConvert ? 'Otevřete projekt pro přidání úkolu' : undefined}
+        disabled={!note || !!note.convertedToTaskId || !linkedProjectId}
+        onClick={onConvert}
+        title={convertTitle(note, linkedProjectId)}
         style={{
           marginLeft: 'auto',
           background: '#0d1f38',
@@ -186,7 +198,6 @@ function NoteBody({
 export function NoteEditor({
   note,
   projects,
-  canConvert,
   onCreate,
   onSave,
   onDelete,
@@ -196,6 +207,12 @@ export function NoteEditor({
 }: NoteEditorProps) {
   const [tab, setTab] = useState<Tab>('edit');
   const editor = useNoteEditor({ note, onCreate, onSave, onPersisted });
+
+  const handleConvert = () => {
+    if (!note) return;
+    editor.flush();
+    onConvert({ ...note, content: editor.content, linkedProjectId: editor.linkedProjectId });
+  };
 
   const handleDelete = async () => {
     if (!note) return onBack();
@@ -236,9 +253,9 @@ export function NoteEditor({
 
       <EditorActions
         note={note}
-        canConvert={canConvert}
+        linkedProjectId={editor.linkedProjectId}
         onDelete={handleDelete}
-        onConvert={onConvert}
+        onConvert={handleConvert}
       />
     </div>
   );

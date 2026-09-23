@@ -1,13 +1,14 @@
 // Testy QuickNotesPanel — přidání, editace, smazání a link na projekt
 // (PRD-04, FR-QN-03…06), přes reálný `useQuickNotes` hook s mockovaným REST API.
-import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useEffect } from 'react';
-import { QuickNotesPanel } from './QuickNotesPanel';
-import { useQuickNotes } from '../../hooks/useQuickNotes';
-import * as quickNotesApi from '../../api/quickNotesApi';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { QuickNote } from '../../api/quickNotesApi';
+import * as quickNotesApi from '../../api/quickNotesApi';
+import { useQuickNotes } from '../../hooks/useQuickNotes';
+import { QuickNotesPanel } from './QuickNotesPanel';
 
 function note(overrides: Partial<QuickNote> = {}): QuickNote {
   return {
@@ -34,13 +35,7 @@ function PanelHarness({ projects = [] }: PanelHarnessProps) {
     load();
   }, [load]);
   return (
-    <QuickNotesPanel
-      notes={notes}
-      projects={projects}
-      canConvert
-      onConvert={vi.fn()}
-      onClose={vi.fn()}
-    />
+    <QuickNotesPanel notes={notes} projects={projects} onConvert={vi.fn()} onClose={vi.fn()} />
   );
 }
 
@@ -172,5 +167,28 @@ describe('QuickNotesPanel — editace, smazání, link na projekt', () => {
     await userEvent.click(screen.getByText('← Zpět'));
     expect(screen.getByRole('option', { name: 'Backend refaktoring' })).toBeInTheDocument();
     expect(screen.getAllByText('Backend refaktoring')).toHaveLength(2); // filtr + tag u poznámky
+  });
+});
+
+describe('QuickNotesPanel — převod právě napsané poznámky', () => {
+  // @scenario: quick-notes.feature > Právě napsanou poznámku lze hned převést na úkol
+  it('po uložení draftu je "→ Přidat jako úkol" aktivní bez opětovného otevření', async () => {
+    vi.spyOn(quickNotesApi, 'listNotes').mockResolvedValue([]);
+    vi.spyOn(quickNotesApi, 'createNote').mockImplementation(async (content, linked, id) =>
+      note({ id, content, linkedProjectId: linked })
+    );
+    render(<PanelHarness projects={[{ id: 'p1', name: 'Backend refaktoring' }]} />);
+
+    await userEvent.click(await screen.findByText('+ Nová poznámka'));
+    await userEvent.type(textareaEl(), 'Doplnit audit log');
+    fireEvent.change(screen.getByLabelText('Přiřadit k projektu'), { target: { value: 'p1' } });
+    const convert = screen.getByRole('button', { name: '→ Přidat jako úkol' });
+    expect(convert).toBeDisabled();
+
+    fireEvent.blur(textareaEl());
+
+    await waitFor(() => expect(convert).toBeEnabled());
+    // Editor po přijetí id nezahodil text, který v něm byl.
+    expect(textareaEl().value).toBe('Doplnit audit log');
   });
 });

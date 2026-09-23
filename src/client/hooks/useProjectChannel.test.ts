@@ -3,12 +3,13 @@
 // Transport je injektovaný přes `options.createTransport`, takže tu nikdy
 // neběží skutečný `@microsoft/signalr` — `FakeTransport` simuluje hub
 // eventy i lifecycle přesně podle rozhraní `ProjectChannelTransport`.
-import { describe, expect, it } from 'vitest';
+
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { useProjectChannel } from './useProjectChannel';
-import type { ProjectChannelTransport } from './useProjectChannel';
+import { describe, expect, it } from 'vitest';
 import { makeAppState, makeTask } from '../state/testFixtures';
 import type { ProjectDiff } from '../types/protocol';
+import type { ProjectChannelTransport } from './useProjectChannel';
+import { useProjectChannel } from './useProjectChannel';
 
 // Stejná signatura jako `ProjectChannelTransport.on`/`off` — heterogenní event bus.
 // biome-ignore lint/suspicious/noExplicitAny: viz komentář výše
@@ -316,5 +317,23 @@ describe('useProjectChannel — seedFromCache (FR-OFFLINE-04)', () => {
     );
 
     expect(result.current.state).toEqual(real);
+  });
+});
+
+describe('useProjectChannel — přepnutí projektu', () => {
+  it('stav předchozího projektu se nepřenese do nového', async () => {
+    const transport = new FakeTransport();
+    const { result, rerender } = renderChannel(transport, 'proj1');
+    act(() => transport.emit('ReceiveFullState', makeAppState({ tasks: [makeTask({ id: 'a' })] })));
+
+    rerender({ id: 'proj2' });
+
+    // Dokud nedorazí stav proj2, nesmí se zobrazovat (ani ukládat do jeho
+    // cache) stav proj1 — a cache proj2 musí jít naseedovat.
+    expect(result.current.state).toBeNull();
+    expect(result.current.getLastConfirmedState()).toBeNull();
+    const cached = makeAppState({ tasks: [makeTask({ id: 'b-cache' })] });
+    act(() => result.current.seedFromCache(cached));
+    expect(result.current.state).toEqual(cached);
   });
 });

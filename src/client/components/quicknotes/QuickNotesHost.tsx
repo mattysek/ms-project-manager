@@ -5,14 +5,13 @@
 // na úkol (FR-QN-07) potřebuje `markConverted` na stejné instanci dat.
 import { useEffect, useState } from 'react';
 import { listProjects } from '../../api/projectsApi';
+import type { QuickNote } from '../../api/quickNotesApi';
 import type { UseQuickNotesResult } from '../../hooks/useQuickNotes';
 import { QuickNotesButton } from './QuickNotesButton';
 import { QuickNotesPanel } from './QuickNotesPanel';
-import type { QuickNote } from '../../api/quickNotesApi';
 
 interface QuickNotesHostProps {
   notes: UseQuickNotesResult;
-  activeProjectId: string | null;
   onConvert: (note: QuickNote) => void;
   /** Otevřenost vlastní volající — oba panely sdílí jedno místo (`useOpenPanel`). */
   open: boolean;
@@ -20,14 +19,7 @@ interface QuickNotesHostProps {
   onClose: () => void;
 }
 
-export function QuickNotesHost({
-  notes,
-  activeProjectId,
-  onConvert,
-  open,
-  onToggle,
-  onClose,
-}: QuickNotesHostProps) {
+export function QuickNotesHost({ notes, onConvert, open, onToggle, onClose }: QuickNotesHostProps) {
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
 
   const load = notes.load;
@@ -47,7 +39,6 @@ export function QuickNotesHost({
         <QuickNotesPanel
           notes={notes}
           projects={projects}
-          canConvert={!!activeProjectId}
           onConvert={onConvert}
           onClose={onClose}
         />

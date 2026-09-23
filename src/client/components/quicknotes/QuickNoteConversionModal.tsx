@@ -1,9 +1,10 @@
 // Konverze poznámky na úkol (FR-QN-07) — znovupoužije `TaskDetailModal`
 // předvyplněný z obsahu poznámky; formulář samotný je beze změny.
-import type { Categories, PersonWithWeeks, Task } from '../../types';
+import { useState } from 'react';
 import type { QuickNote } from '../../api/quickNotesApi';
-import { TaskDetailModal } from '../TaskDetailModal';
+import type { Categories, PersonWithWeeks, Task } from '../../types';
 import { uid } from '../../utils';
+import { TaskDetailModal } from '../TaskDetailModal';
 
 interface QuickNoteConversionModalProps {
   note: QuickNote;
@@ -26,7 +27,11 @@ export function QuickNoteConversionModal({
   onCreated,
   onClose,
 }: QuickNoteConversionModalProps) {
-  const draft: Task = {
+  // Koncept vzniká jednou za život modalu. Jako obyčejná proměnná měl na
+  // každý render nové id i identitu — a `useTaskDraft` se na novou identitu
+  // resetuje, takže každé překreslení rodiče (presence, diff, autosave
+  // poznámky) smazalo, co uživatel do formuláře vyplnil.
+  const [draft] = useState<Task>(() => ({
     id: uid(),
     p: '',
     name: taskNameFrom(note.content),
@@ -37,7 +42,7 @@ export function QuickNoteConversionModal({
     progress: 0,
     desc: note.content,
     links: [],
-  };
+  }));
 
   return (
     <TaskDetailModal

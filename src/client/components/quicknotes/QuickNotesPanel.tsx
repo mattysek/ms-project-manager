@@ -1,11 +1,11 @@
 // Floating sidebar vpravo — FR-QN-01. Skládá seznam a editor; sám neřeší
 // persistenci (to `useQuickNotes`/`useNoteEditor`), jen výběr aktivní poznámky.
-import { useState, type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import type { QuickNote } from '../../api/quickNotesApi';
 import type { UseQuickNotesResult } from '../../hooks/useQuickNotes';
-import { NoteList } from './NoteList';
-import { NoteEditor } from './NoteEditor';
 import { FloatingPanel } from '../FloatingPanel';
+import { NoteEditor } from './NoteEditor';
+import { NoteList } from './NoteList';
 
 interface ProjectOption {
   id: string;
@@ -15,7 +15,6 @@ interface ProjectOption {
 interface QuickNotesPanelProps {
   notes: UseQuickNotesResult;
   projects: ProjectOption[];
-  canConvert: boolean;
   onConvert: (note: QuickNote) => void;
   onClose: () => void;
 }
@@ -46,7 +45,6 @@ function PendingBadge({ count }: { count: number }) {
 function PanelBody({
   notes,
   projects,
-  canConvert,
   onConvert,
   selection,
   setSelection,
@@ -80,24 +78,20 @@ function PanelBody({
         selection.kind === 'note' ? (notes.notes.find((n) => n.id === selection.id) ?? null) : null
       }
       projects={projects}
-      canConvert={canConvert}
       onCreate={notes.createNote}
       onSave={notes.saveNote}
       onDelete={notes.deleteNote}
       onConvert={onConvert}
-      onPersisted={() => {}}
+      // Uložený draft se stává skutečnou poznámkou — bez přepnutí výběru by
+      // editor dál držel `note = null` a „→ Přidat jako úkol" zůstalo
+      // zašedlé, dokud se uživatel nevrátil do seznamu a poznámku neotevřel.
+      onPersisted={(saved) => setSelection({ kind: 'note', id: saved.id })}
       onBack={() => setSelection({ kind: 'list' })}
     />
   );
 }
 
-export function QuickNotesPanel({
-  notes,
-  projects,
-  canConvert,
-  onConvert,
-  onClose,
-}: QuickNotesPanelProps) {
+export function QuickNotesPanel({ notes, projects, onConvert, onClose }: QuickNotesPanelProps) {
   const [selection, setSelection] = useState<Selection>({ kind: 'list' });
 
   return (
@@ -111,7 +105,6 @@ export function QuickNotesPanel({
       <PanelBody
         notes={notes}
         projects={projects}
-        canConvert={canConvert}
         onConvert={onConvert}
         selection={selection}
         setSelection={setSelection}

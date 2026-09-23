@@ -5,15 +5,15 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { AppStyles } from './AppStyles';
-import { TopBar } from './TopBar';
-import { QuickNotesHost } from './quicknotes/QuickNotesHost';
-import { VaultHost } from './vault/VaultHost';
-import { useOpenPanel } from '../hooks/useOpenPanel';
-import * as vaultApi from '../api/vaultApi';
-import * as quickNotesApi from '../api/quickNotesApi';
 import * as projectsApi from '../api/projectsApi';
+import * as quickNotesApi from '../api/quickNotesApi';
+import * as vaultApi from '../api/vaultApi';
+import { useOpenPanel } from '../hooks/useOpenPanel';
 import { useQuickNotes } from '../hooks/useQuickNotes';
+import { AppStyles } from './AppStyles';
+import { QuickNotesHost } from './quicknotes/QuickNotesHost';
+import { TopBar } from './TopBar';
+import { VaultHost } from './vault/VaultHost';
 
 vi.mock('../api/vaultApi');
 
@@ -47,7 +47,6 @@ function Bar() {
         quickNotes={
           <QuickNotesHost
             notes={notes}
-            activeProjectId="p1"
             onConvert={vi.fn()}
             open={panel.open === 'notes'}
             onToggle={() => panel.toggle('notes')}

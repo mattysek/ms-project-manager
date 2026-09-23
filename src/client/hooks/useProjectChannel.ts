@@ -11,8 +11,9 @@
 // a `error` diffy ignoruje (nechává doménový stav beze změny); rollback při
 // chybě proto řeší tento hook přes `lastConfirmedStateRef` (ADR-004, sekce
 // „Optimistická aplikace").
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+
 import { HubConnectionBuilder } from '@microsoft/signalr';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { applyDiff } from '../state/applyDiff';
 import type { AppState } from '../state/appState';
 import type { PresenceEntry, ProjectCommand, ProjectDiff } from '../types/protocol';
@@ -483,6 +484,26 @@ function useChannelActions(ctx: SendCommandCtx) {
   return { sendCommand, sendCommandAwaitable, getLastConfirmedState, applyLocal };
 }
 
+/**
+ * Přepnutí projektu musí zahodit stav předchozího — a to už během renderu,
+ * ne v efektu. Jinak by první commit s novým `projectId` nesl ještě starý
+ * stav: `useProjectCacheSync` by ho uložil do cache NOVÉHO projektu,
+ * `seedFromCache` (`prev ?? cached`) by cache nového projektu ignoroval
+ * a UI by na okamžik vydávalo cizí projekt za otevřený.
+ */
+function useResetOnProjectSwitch(
+  projectId: string | null,
+  setState: React.Dispatch<React.SetStateAction<AppState | null>>,
+  lastConfirmedStateRef: React.MutableRefObject<AppState | null>
+): void {
+  const [stateProjectId, setStateProjectId] = useState(projectId);
+  if (stateProjectId !== projectId) {
+    setStateProjectId(projectId);
+    setState(null);
+    lastConfirmedStateRef.current = null;
+  }
+}
+
 export function useProjectChannel(
   projectId: string | null,
   options: UseProjectChannelOptions = {}
@@ -499,6 +520,8 @@ export function useProjectChannel(
 
   const transportRef = useRef<ProjectChannelTransport | null>(null);
   const lastConfirmedStateRef = useRef<AppState | null>(null);
+
+  useResetOnProjectSwitch(projectId, setState, lastConfirmedStateRef);
 
   // `createTransport` je typicky inline factory (testy, případná budoucí
   // App.tsx integrace) — bez refu by jeho nestabilní identita mezi rendery

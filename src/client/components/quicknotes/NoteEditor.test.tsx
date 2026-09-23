@@ -1,10 +1,11 @@
 // Testy NoteEditor — editace, autosave, preview markdownu, konverze na úkol
 // (PRD-04, FR-QN-04, FR-QN-07).
-import { afterEach, describe, expect, it, vi } from 'vitest';
+
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { NoteEditor } from './NoteEditor';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { QuickNote } from '../../api/quickNotesApi';
+import { NoteEditor } from './NoteEditor';
 
 function note(overrides: Partial<QuickNote> = {}): QuickNote {
   return {
@@ -23,7 +24,6 @@ function renderEditor(overrides: Partial<Parameters<typeof NoteEditor>[0]> = {})
     <NoteEditor
       note={note()}
       projects={[]}
-      canConvert
       onCreate={vi.fn()}
       onSave={vi.fn()}
       onDelete={vi.fn()}
@@ -74,10 +74,32 @@ describe('NoteEditor', () => {
     expect(screen.queryByText(/##\s*TODO/)).not.toBeInTheDocument();
   });
 
-  // @scenario: quick-notes.feature > Tlačítko konverze je neaktivní bez otevřeného projektu
-  it('tlačítko "→ Přidat jako úkol" je neaktivní, když není otevřený projekt', () => {
-    renderEditor({ canConvert: false });
+  // @scenario: quick-notes.feature > Tlačítko konverze je neaktivní u poznámky bez projektu
+  it('tlačítko "→ Přidat jako úkol" je neaktivní, když poznámka nemá projekt', () => {
+    renderEditor({ note: note({ linkedProjectId: null }) });
 
     expect(screen.getByRole('button', { name: '→ Přidat jako úkol' })).toBeDisabled();
+  });
+
+  it('převod dostane projekt a obsah z editoru, i když autosave ještě neproběhl', async () => {
+    const onConvert = vi.fn();
+    renderEditor({
+      note: note({ content: 'Draft' }),
+      projects: [{ id: 'p2', name: 'Frontend redesign' }],
+      onSave: vi.fn().mockResolvedValue(null),
+      onConvert,
+    });
+
+    const button = screen.getByRole('button', { name: '→ Přidat jako úkol' });
+    expect(button).toBeDisabled();
+    fireEvent.change(screen.getByLabelText('Přiřadit k projektu'), { target: { value: 'p2' } });
+    fireEvent.change(screen.getByPlaceholderText('Napište poznámku…'), {
+      target: { value: 'Draft doplněný' },
+    });
+    await userEvent.click(button);
+
+    expect(onConvert).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'n1', content: 'Draft doplněný', linkedProjectId: 'p2' })
+    );
   });
 });

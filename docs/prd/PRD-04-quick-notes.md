@@ -69,14 +69,18 @@ Quick Notes jsou per-user markdown poznámky sloužící k zachycení myšlenek,
 - V panelu lze filtrovat poznámky dle projektu
 
 ### FR-QN-07: Konverze poznámky na úkol
-- Tlačítko "→ Přidat jako úkol" je aktivní pouze pokud:
-  1. Je otevřený projekt (uživatel má projekt v kontextu)
-  2. Uživatel má oprávnění přidat úkol v daném projektu
-- Po kliknutí se otevře `TaskDetailModal` s předvyplněnými poli:
+- Tlačítko "→ Přidat jako úkol" je aktivní pouze pokud je poznámka přiřazená k projektu (FR-QN-06).
+  Úkol vzniká v **projektu poznámky**, ne v právě otevřeném — u nepřiřazené poznámky není kam ho dát.
+  Převod je dostupný každému členovi projektu, tedy i Devovi.
+- Po kliknutí se otevře projekt poznámky na záložce Úkoly (panel poznámek se zavře) a nad ní
+  `TaskDetailModal` s předvyplněnými poli:
   - `name`: první řádek poznámky (nebo prvních 60 znaků)
   - `desc`: celý obsah poznámky (jako markdown)
-  - Ostatní pole: výchozí hodnoty (backlog, aktuální uživatel, 1 MD)
+  - Ostatní pole: výchozí hodnoty (backlog, 1 MD)
+  - Dev dostane k přiřazení jen backlog a osobu namapovanou na svůj účet — nic jiného by server
+    nepřijal (ADR-006) a poznámka by už byla označená jako převedená
 - Po uložení úkolu:
+  - Nad záložkou Úkoly se rovnou otevře detail nově vytvořeného úkolu
   - Poznámka se označí jako konvertovaná: `converted_to_task_id = taskId`
   - Poznámka zůstává v seznamu ale je označena tagem "→ Úkol: [název úkolu]"
   - Poznámka je read-only (nelze ji konvertovat znovu)

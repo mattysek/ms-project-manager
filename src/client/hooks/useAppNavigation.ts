@@ -2,9 +2,9 @@
 // stavem `currentProjectId`. Vytaženo z `AuthenticatedApp`, aby zůstala pod
 // rozpočtem ADR-012 (délka funkce).
 import { useCallback, useState } from 'react';
-import type { Route } from './useRoute';
 import type { ViewType } from '../types';
 import type { AuthenticatedAuth } from './useAuth';
+import { projectIdFromPath, type Route } from './useRoute';
 
 export interface UseAppNavigationResult {
   loadProject: (id: string) => void;
@@ -16,6 +16,14 @@ export interface UseAppNavigationResult {
    * ukazuje tam, kde se i edituje, tedy v `TaskDetailModal` nad Úkoly.
    */
   loadProjectTask: (projectId: string, taskId: string) => void;
+  /**
+   * Otevře projekt na Úkolech — převod poznámky na úkol (FR-QN-07) tam
+   * ukazuje formulář nového úkolu. Je-li projekt už otevřený, jen přepne
+   * záložku a nepřidává do historie druhý stejný záznam.
+   */
+  openProjectTasks: (projectId: string) => void;
+  /** Rozbalí na Úkolech detail úkolu, jakmile dorazí do stavu. */
+  focusTask: (taskId: string) => void;
   /** Úkol, jehož detail se má otevřít po načtení projektu; jednorázový. */
   pendingTaskId: string | null;
   clearPendingTask: () => void;
@@ -62,6 +70,15 @@ export function useAppNavigation(
     [route, setCurrentProjectId, setView]
   );
 
+  const openProjectTasks = useCallback(
+    (projectId: string) => {
+      setCurrentProjectId(projectId);
+      setView('seznam');
+      if (projectIdFromPath(route.path) !== projectId) route.navigate(`/projects/${projectId}`);
+    },
+    [route, setCurrentProjectId, setView]
+  );
+
   const handleLogout = useCallback(() => {
     closeProject();
     auth.logout();
@@ -73,6 +90,8 @@ export function useAppNavigation(
   return {
     loadProject,
     loadProjectTask,
+    openProjectTasks,
+    focusTask: setPendingTaskId,
     pendingTaskId,
     clearPendingTask: useCallback(() => setPendingTaskId(null), []),
     closeProject,

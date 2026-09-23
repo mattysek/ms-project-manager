@@ -11,6 +11,7 @@ import {
   createProject,
   createUser,
   loginAs,
+  openNotesPanel,
   openProject,
   setProjectDates,
   unique,
@@ -378,5 +379,58 @@ test.describe('Undo / redo', () => {
     await page.getByRole('tab', { name: 'Úkoly' }).click();
     await expect(page.getByTitle('Zpět (Ctrl+Z)')).toBeDisabled();
     await expect(page.getByTitle('Znovu (Ctrl+Shift+Z)')).toBeDisabled();
+  });
+});
+
+test.describe('Poznámka → úkol', () => {
+  // Dev dřív úkol z poznámky nevytvořil: nově napsaná poznámka zůstala v
+  // editoru „neuložená" a tlačítko zašedlé. Test proto začíná na seznamu
+  // projektů — převod musí sám otevřít projekt, ke kterému poznámka patří.
+  test('Dev převede novou poznámku na úkol v jejím projektu', async ({ browser, request }) => {
+    const pm = await createUser(request, 'Jan Novák');
+    const dev = await createUser(request, 'Petra Kolářová');
+
+    const pmContext = await browser.newContext();
+    const pmPage = await pmContext.newPage();
+    await loginAs(pmPage, pm);
+    const name = unique('Poznamka');
+    await createProject(pmPage, name);
+    await addMember(pmPage, dev);
+
+    const devContext = await browser.newContext();
+    const page = await devContext.newPage();
+    await loginAs(page, dev);
+    await expect(page.getByText(name, { exact: true })).toBeVisible();
+
+    await openNotesPanel(page);
+    await page.getByRole('button', { name: /Nová poznámka/i }).click();
+    const editor = page.getByPlaceholder('Napište poznámku…');
+    await editor.fill('Doplnit audit log');
+    await page.getByLabel('Přiřadit k projektu').selectOption({ label: name });
+    await editor.blur();
+
+    await page.getByRole('button', { name: '→ Přidat jako úkol' }).click();
+
+    // Projekt poznámky se otevřel na Úkolech a nad nimi formulář nového úkolu.
+    // Přesné jméno: řádek v seznamu má „Název úkolu — …", detail jen „Název úkolu".
+    const detailName = page.getByRole('textbox', { name: 'Název úkolu', exact: true });
+    await expect(page.getByText('← Projekty')).toBeVisible();
+    await expect(detailName).toHaveValue('Doplnit audit log');
+    await page.getByRole('button', { name: 'Uložit změny' }).click();
+
+    // Po uložení je rovnou otevřený detail vytvořeného úkolu — a úkol už
+    // stojí v seznamu pod ním.
+    await expect(detailName).toHaveValue('Doplnit audit log');
+    await expect(page.getByLabel('Název úkolu — Doplnit audit log')).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Quick Notes' })).toHaveCount(0);
+
+    // Server úkol přijal — po reloadu tam pořád je.
+    await page.reload();
+    await page.getByRole('tab', { name: 'Úkoly' }).click();
+    await expect(page.getByLabel('Název úkolu — Doplnit audit log')).toBeVisible();
+
+    await pmContext.close();
+    await devContext.close();
   });
 });

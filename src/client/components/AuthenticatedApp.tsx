@@ -1,30 +1,30 @@
 // Vše, co App.tsx dělalo předtím, plus routing na `/admin/users` a Quick
 // Notes/TopBar — vytaženo z `App.tsx`, aby `AuthGate` (přihlášení) a tahle
 // komponenta (aplikace samotná) byly každá pod rozpočtem ADR-012 zvlášť.
-import { useState, type ReactNode } from 'react';
-import type { ViewType } from '../types';
+import { type ReactNode, useState } from 'react';
 import { INIT_PROJECT } from '../constants';
-import { LandingPage } from './LandingPage';
-import { ProjectWorkspace } from './ProjectWorkspace';
-import { TopBar, TOP_BAR_HEIGHT } from './TopBar';
-import { AppStyles } from './AppStyles';
-import { AdminUsersPage } from './admin/AdminUsersPage';
-import { MyWorkPage } from './workload/MyWorkPage';
-import { QuickNotesHost } from './quicknotes/QuickNotesHost';
-import { VaultHost } from './vault/VaultHost';
-import { WorkLogHost } from './worklog/WorkLogHost';
-import { WorkLogPage } from './worklog/WorkLogPage';
-import { useNoteConversion } from './quicknotes/useNoteConversion';
-import { useProjectSession } from '../hooks/useProjectSession';
 import { useAppCommands } from '../hooks/appCommands';
 import { useAppLifecycleEffects } from '../hooks/useAppLifecycleEffects';
 import { useAppNavigation } from '../hooks/useAppNavigation';
-import { useProjectDerivedData } from '../hooks/useProjectDerivedData';
-import { useExportImport } from '../hooks/useExportImport';
-import { useQuickNotes } from '../hooks/useQuickNotes';
-import { useRoute, projectIdFromPath } from '../hooks/useRoute';
-import { useOpenPanel } from '../hooks/useOpenPanel';
 import type { AuthenticatedAuth } from '../hooks/useAuth';
+import { useExportImport } from '../hooks/useExportImport';
+import { useOpenPanel } from '../hooks/useOpenPanel';
+import { useProjectDerivedData } from '../hooks/useProjectDerivedData';
+import { useProjectSession } from '../hooks/useProjectSession';
+import { useQuickNotes } from '../hooks/useQuickNotes';
+import { projectIdFromPath, useRoute } from '../hooks/useRoute';
+import type { ViewType } from '../types';
+import { AppStyles } from './AppStyles';
+import { AdminUsersPage } from './admin/AdminUsersPage';
+import { LandingPage } from './LandingPage';
+import { ProjectWorkspace } from './ProjectWorkspace';
+import { QuickNotesHost } from './quicknotes/QuickNotesHost';
+import { useNoteConversion } from './quicknotes/useNoteConversion';
+import { TOP_BAR_HEIGHT, TopBar } from './TopBar';
+import { VaultHost } from './vault/VaultHost';
+import { MyWorkPage } from './workload/MyWorkPage';
+import { WorkLogHost } from './worklog/WorkLogHost';
+import { WorkLogPage } from './worklog/WorkLogPage';
 
 const LOADING_STYLE = {
   fontFamily: "'IBM Plex Mono','Courier New',monospace",
@@ -111,11 +111,13 @@ function useWorkspaceData({
   view,
   userId,
   notes,
+  nav,
 }: {
   currentProjectId: string | null;
   view: ViewType;
-  userId: string | undefined;
+  userId: string;
   notes: ReturnType<typeof useQuickNotes>;
+  nav: ReturnType<typeof useAppNavigation>;
 }) {
   const session = useProjectSession(currentProjectId, { userId });
   const commands = useAppCommands({
@@ -147,6 +149,10 @@ function useWorkspaceData({
     notes,
     state: session.state,
     derived,
+    currentProjectId,
+    viewer: { role: session.myRole, userId },
+    openProjectTasks: nav.openProjectTasks,
+    focusTask: nav.focusTask,
     onCreated: (task) => commands.setTasks((prev) => [...prev, task]),
   });
 
@@ -175,7 +181,6 @@ function AppTopBar({
   onLogout,
   panel,
   notes,
-  activeProjectId,
   onConvert,
 }: {
   auth: AuthenticatedAuth;
@@ -184,7 +189,6 @@ function AppTopBar({
   onLogout: () => void;
   panel: ReturnType<typeof useOpenPanel>;
   notes: ReturnType<typeof useQuickNotes>;
-  activeProjectId: string | null;
   onConvert: React.ComponentProps<typeof QuickNotesHost>['onConvert'];
 }) {
   return (
@@ -196,8 +200,11 @@ function AppTopBar({
       quickNotes={
         <QuickNotesHost
           notes={notes}
-          activeProjectId={activeProjectId}
-          onConvert={onConvert}
+          onConvert={(note) => {
+            // Panel by jinak zakrýval Úkoly, na kterých se nový úkol ukáže.
+            panel.close();
+            onConvert(note);
+          }}
           open={panel.open === 'notes'}
           onToggle={() => panel.toggle('notes')}
           onClose={panel.close}
@@ -237,7 +244,7 @@ export function AuthenticatedApp({ auth }: AuthenticatedAppProps) {
   // takže smí být otevřený jen jeden.
   const panel = useOpenPanel();
 
-  const ws = useWorkspaceData({ currentProjectId, view, userId: auth.user?.userId, notes });
+  const ws = useWorkspaceData({ currentProjectId, view, userId: auth.user.userId, notes, nav });
   const { session, commands, project, derived, exportImport, conversion } = ws;
 
   // Přehled napříč projekty stojí mimo projekt (PRD-08), takže i mimo
@@ -272,7 +279,6 @@ export function AuthenticatedApp({ auth }: AuthenticatedAppProps) {
         onLogout={nav.handleLogout}
         panel={panel}
         notes={notes}
-        activeProjectId={currentProjectId}
         onConvert={conversion.requestConvert}
       />
       <MainContent
